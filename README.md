@@ -29,18 +29,18 @@ The project is then available at `https://<directory-name>.localhost`; `/` is se
 ## MVP commands
 
 ```text
-serve-them                         foreground mode
-serve-them start [path]            background mode
-serve-them stop|restart [path]
-serve-them status [path]
-serve-them list [--enabled]
-serve-them logs [web|api] [--follow]
-serve-them open
-serve-them enable|disable
-serve-them doctor
-serve-them certificate status|repair
-serve-them install
-serve-them uninstall [--remove-ca]
+serve-them                              Start a project in the foreground.
+serve-them start [path]                 Start a project in the background.
+serve-them stop|restart [path]          Stop or restart a background project.
+serve-them status [path]                Show project and service status.
+serve-them list [--enabled]             List registered or login-enabled projects.
+serve-them logs [web|api] [--follow]    Print or follow project logs.
+serve-them open                         Open the project URL in a browser.
+serve-them enable|disable               Enable or disable startup after user login.
+serve-them doctor                       Diagnose the local installation.
+serve-them certificate status|repair    Inspect or repair certificate authority trust.
+serve-them install                      Install the HTTPS edge and trusted CA.
+serve-them uninstall [--remove-ca]      Remove Serve Them and optionally its trusted CA.
 ```
 
 `install` is macOS-only in the first release. It creates and trusts a private local CA and installs the narrowly scoped edge service on ports 80 and 443. Application commands always run as the current, unprivileged user. `enable` uses a per-user LaunchAgent and starts the project only after login.
