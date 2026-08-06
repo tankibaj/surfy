@@ -21,6 +21,7 @@ import (
 	"github.com/tankibaj/server-them/internal/cert"
 	"github.com/tankibaj/server-them/internal/edge"
 	"github.com/tankibaj/server-them/internal/manifest"
+	"github.com/tankibaj/server-them/internal/scaffold"
 	"github.com/tankibaj/server-them/internal/state"
 	"github.com/tankibaj/server-them/internal/supervisor"
 )
@@ -34,6 +35,16 @@ func Run(args []string, out, errOut io.Writer) error {
 	cmd := args[0]
 	rest := args[1:]
 	switch cmd {
+	case "init":
+		if len(rest) > 0 {
+			return errors.New("serve-them init uses the current directory and accepts no path")
+		}
+		file, e := scaffold.Create(".")
+		if e != nil {
+			return e
+		}
+		fmt.Fprintf(out, "✓ created %s\n", file)
+		return nil
 	case "start":
 		path := argPath(rest)
 		mf, e := manifest.Find(path)
@@ -895,6 +906,7 @@ Usage:
   serve-them <command> [options] [path]
 
 Project commands:
+  init                                    Create serve.yaml in the current directory.
   start [path]                            Start a project in the background.
   stop [path]                             Stop a background project.
   restart [path]                          Restart a background project.
