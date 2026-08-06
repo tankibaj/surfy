@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/tankibaj/server-them/internal/state"
 )
 
 func TestHelpDescribesCommands(t *testing.T) {
@@ -16,7 +18,7 @@ func TestHelpDescribesCommands(t *testing.T) {
 	if err := Run([]string{"--help"}, &out, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"serve-them [path]", "start [path]", "Start a project in the background.", "logs [web|api] [--follow]", "Stream or print project logs.", "certificate status", "Show local certificate authority status.", "uninstall [--remove-ca]", "Remove Serve Them and optionally its trusted CA."} {
+	for _, expected := range []string{"serve-them [path]", "start [project-name|path]", "Start a project in the background.", "logs [project-name|path] [web|api] [--follow]", "Stream or print project logs.", "certificate status", "Show local certificate authority status.", "uninstall [--remove-ca]", "Remove Serve Them and optionally its trusted CA."} {
 		if !strings.Contains(out.String(), expected) {
 			t.Errorf("help does not contain %q:\n%s", expected, out.String())
 		}
@@ -327,5 +329,147 @@ func TestPrepareUserStateMigratesOnlyPermissionFailureAtDefaultPath(t *testing.T
 				t.Fatalf("migrations %d, want %d", migrations, wantMigrations)
 			}
 		})
+	}
+}
+
+func TestLogsSelectsRegisteredProjectByName(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	webLog := filepath.Join(d, "web.log")
+	apiLog := filepath.Join(d, "api.log")
+	if e := os.WriteFile(webLog, []byte("web output\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(apiLog, []byte("api output\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	registerLogProject(t, "deliverydeck", webLog, apiLog)
+	var out bytes.Buffer
+	if e := logs([]string{"deliverydeck"}, &out); e != nil {
+		t.Fatal(e)
+	}
+	if got := out.String(); !strings.Contains(got, "web output") || !strings.Contains(got, "api output") {
+		t.Fatalf("unexpected logs %q", got)
+	}
+}
+
+func TestLogsSelectsProjectAndService(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	webLog := filepath.Join(d, "web.log")
+	apiLog := filepath.Join(d, "api.log")
+	_ = os.WriteFile(webLog, []byte("web output\n"), 0600)
+	_ = os.WriteFile(apiLog, []byte("api output\n"), 0600)
+	registerLogProject(t, "deliverydeck", webLog, apiLog)
+	var out bytes.Buffer
+	if e := logs([]string{"deliverydeck", "api"}, &out); e != nil {
+		t.Fatal(e)
+	}
+	if got := out.String(); got != "api output\n" {
+		t.Fatalf("unexpected logs %q", got)
+	}
+}
+
+func TestLogsRejectsUnknownProjectName(t *testing.T) {
+	t.Setenv("SERVE_THEM_STATE_DIR", t.TempDir())
+	var out bytes.Buffer
+	e := logs([]string{"missing-project"}, &out)
+	if e == nil || !strings.Contains(e.Error(), `project "missing-project" is not registered`) {
+		t.Fatalf("unexpected error %v", e)
+	}
+}
+
+func registerLogProject(t *testing.T, name, webLog, apiLog string) {
+	t.Helper()
+	e := state.Update(func(r *state.Registry) error {
+		r.Projects[name] = &state.Project{ID: name, Name: name, Manifest: filepath.Join(t.TempDir(), "serve.yaml"), Status: "running", Web: &state.Service{Log: webLog}, API: &state.Service{Log: apiLog}}
+		return nil
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+}
+
+func TestResolveManifestByRegisteredName(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	mf := filepath.Join(d, "deliverydeck", "serve.yaml")
+	if e := os.MkdirAll(filepath.Dir(mf), 0755); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(mf, []byte("web: .\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	canonical, e := filepath.EvalSymlinks(mf)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := state.Update(func(r *state.Registry) error {
+		r.Projects[state.ProjectID(canonical)] = &state.Project{ID: state.ProjectID(canonical), Name: "deliverydeck", Manifest: canonical, Status: "stopped"}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	got, e := resolveManifest("deliverydeck")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if got != canonical {
+		t.Fatalf("got %q want %q", got, canonical)
+	}
+}
+
+func TestResolveManifestPrefersExistingPath(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	mf := filepath.Join(d, "serve.yaml")
+	if e := os.WriteFile(mf, []byte("web: .\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := state.Update(func(r *state.Registry) error {
+		r.Projects["id"] = &state.Project{ID: "id", Name: d, Manifest: "/wrong/serve.yaml"}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	got, e := resolveManifest(d)
+	if e != nil {
+		t.Fatal(e)
+	}
+	want, e := filepath.EvalSymlinks(mf)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestStatusAndStopAcceptRegisteredName(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	mf := filepath.Join(d, "serve.yaml")
+	if e := os.WriteFile(mf, []byte("web: .\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	canonical, e := filepath.EvalSymlinks(mf)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := state.Update(func(r *state.Registry) error {
+		r.Projects[state.ProjectID(canonical)] = &state.Project{ID: state.ProjectID(canonical), Name: "deliverydeck", Manifest: canonical, Status: "stopped"}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	var out bytes.Buffer
+	if e := status("deliverydeck", &out); e != nil {
+		t.Fatal(e)
+	}
+	if !strings.Contains(out.String(), "Project: deliverydeck") {
+		t.Fatal(out.String())
+	}
+	if e := stop("deliverydeck", &out); e == nil || e.Error() != "project is not running" {
+		t.Fatalf("unexpected stop error %v", e)
 	}
 }

@@ -31,13 +31,16 @@ The project is then available at `https://<directory-name>.localhost`; `/` is se
 ```text
 serve-them                              Start a project in the foreground.
 serve-them init                         Create serve.yaml in the current directory.
-serve-them start [path]                 Start a project in the background.
-serve-them stop|restart [path]          Stop or restart a background project.
-serve-them status [path]                Show project and service status.
+serve-them start [project-name|path]    Start a project in the background.
+serve-them stop|restart [project-name|path]
+                                        Stop or restart a background project.
+serve-them status [project-name|path]   Show project and service status.
 serve-them list [--enabled]             List registered or login-enabled projects.
-serve-them logs [web|api] [--follow]    Print or follow project logs.
-serve-them open                         Open the project URL in a browser.
-serve-them enable|disable               Enable or disable startup after user login.
+serve-them logs [project-name|path] [web|api] [--follow]
+                                        Print or follow project logs.
+serve-them open [project-name|path]     Open the project URL in a browser.
+serve-them enable|disable [project-name|path]
+                                        Enable or disable startup after user login.
 serve-them doctor                       Diagnose the local installation.
 serve-them certificate status|repair    Inspect or repair certificate authority trust.
 serve-them install                      Install the HTTPS edge and trusted CA.
@@ -61,6 +64,8 @@ api:
     # Path is passed through; Serve Them never reads this file.
     ENV_FILE: ./.env
 ```
+
+Combined logs use stable per-service colors and severity markers (`·` debug, `ℹ` info, `⚠` warning, `✖` error/fatal). Set `NO_COLOR=1` to disable ANSI colors while retaining the indicators. Future service names receive deterministic colors.
 
 `install` is macOS-only in the first release. It creates and trusts a private local CA and installs the narrowly scoped edge service on ports 80 and 443. Application commands always run as the current, unprivileged user. `enable` uses a per-user LaunchAgent and starts the project only after login.
 

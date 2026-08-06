@@ -19,6 +19,7 @@ import (
 
 	"github.com/tankibaj/server-them/internal/cert"
 	"github.com/tankibaj/server-them/internal/detect"
+	"github.com/tankibaj/server-them/internal/logview"
 	"github.com/tankibaj/server-them/internal/manifest"
 	"github.com/tankibaj/server-them/internal/state"
 )
@@ -347,7 +348,7 @@ func start(name string, svc *manifest.Service, d detect.Result, port int, bg boo
 		return nil, err
 	}
 	s := &running{name: name, port: port, cmd: cmd, log: lf, done: make(chan error, 1), svc: svc, det: d, started: time.Now()}
-	go prefix(pr, dest, name)
+	go prefix(pr, dest, name, !bg)
 	go func() {
 		e := cmd.Wait()
 		_ = pw.Close()
@@ -361,7 +362,7 @@ func start(name string, svc *manifest.Service, d detect.Result, port int, bg boo
 	return s, nil
 }
 
-func prefix(r io.Reader, w io.Writer, name string) {
+func prefix(r io.Reader, w io.Writer, name string, styled bool) {
 	br := bufio.NewReaderSize(r, 64<<10)
 	lineStart := true
 	for {
@@ -371,7 +372,20 @@ func prefix(r io.Reader, w io.Writer, name string) {
 		}
 		if len(part) > 0 {
 			if lineStart {
-				fmt.Fprintf(w, "%s [%s] ", time.Now().Format(time.RFC3339), name)
+				header := fmt.Sprintf("%s [%s] ", time.Now().Format(time.RFC3339), name)
+				if styled {
+					_, _ = io.WriteString(w, logview.Format(header+string(part), logview.Enabled(w)))
+					lineStart = false
+					if !continued {
+						_, _ = io.WriteString(w, "\n")
+						lineStart = true
+					}
+					if e != nil {
+						return
+					}
+					continue
+				}
+				_, _ = io.WriteString(w, header)
 			}
 			_, _ = w.Write(part)
 			lineStart = false

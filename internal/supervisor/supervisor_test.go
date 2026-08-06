@@ -11,7 +11,7 @@ import (
 func TestPrefixStreamsLargeLines(t *testing.T) {
 	line := strings.Repeat("x", 128<<10)
 	var out bytes.Buffer
-	prefix(strings.NewReader(line+"\n"), &out, "api")
+	prefix(strings.NewReader(line+"\n"), &out, "api", false)
 	if !strings.Contains(out.String(), "[api] ") || !strings.Contains(out.String(), line[len(line)-1024:]) {
 		t.Fatal("large line was truncated")
 	}

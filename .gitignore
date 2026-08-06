@@ -1,4 +1,5 @@
 /bin/
+/serve-them
 /dist/
 /.serve-them-state/
 *.log

@@ -20,6 +20,7 @@ import (
 	"github.com/tankibaj/server-them/internal/buildinfo"
 	"github.com/tankibaj/server-them/internal/cert"
 	"github.com/tankibaj/server-them/internal/edge"
+	"github.com/tankibaj/server-them/internal/logview"
 	"github.com/tankibaj/server-them/internal/manifest"
 	"github.com/tankibaj/server-them/internal/scaffold"
 	"github.com/tankibaj/server-them/internal/state"
@@ -47,7 +48,7 @@ func Run(args []string, out, errOut io.Writer) error {
 		return nil
 	case "start":
 		path := argPath(rest)
-		mf, e := manifest.Find(path)
+		mf, e := resolveManifest(path)
 		if e != nil {
 			return e
 		}
@@ -149,7 +150,7 @@ func Run(args []string, out, errOut io.Writer) error {
 	case "logs":
 		return logs(rest, out)
 	case "open":
-		mf, e := manifest.Find(argPath(rest))
+		mf, e := resolveManifest(argPath(rest))
 		if e != nil {
 			return e
 		}
@@ -196,8 +197,25 @@ func argPath(args []string) string {
 	}
 	return "."
 }
+func resolveManifest(selector string) (string, error) {
+	if selector == "" {
+		selector = "."
+	}
+	if _, e := os.Stat(selector); e == nil {
+		return manifest.Find(selector)
+	}
+	r, e := state.Read()
+	if e != nil {
+		return "", e
+	}
+	p := state.FindByName(r, selector)
+	if p == nil {
+		return "", fmt.Errorf("project %q is not registered and the path does not exist", selector)
+	}
+	return manifest.Find(p.Manifest)
+}
 func stop(path string, out io.Writer) error {
-	mf, e := manifest.Find(path)
+	mf, e := resolveManifest(path)
 	if e != nil {
 		return e
 	}
@@ -219,7 +237,7 @@ func stop(path string, out io.Writer) error {
 	return nil
 }
 func status(path string, out io.Writer) error {
-	mf, e := manifest.Find(path)
+	mf, e := resolveManifest(path)
 	if e != nil {
 		return e
 	}
@@ -277,22 +295,44 @@ func list(out io.Writer, enabled bool) error {
 func logs(args []string, out io.Writer) error {
 	follow := false
 	service := ""
+	selector := ""
 	for _, a := range args {
 		if a == "--follow" || a == "-f" {
 			follow = true
 		} else if a == "web" || a == "api" {
 			service = a
+		} else if strings.HasPrefix(a, "-") {
+			return fmt.Errorf("unknown logs option %q", a)
+		} else if selector == "" {
+			selector = a
+		} else {
+			return errors.New("logs accepts one project name or path and one service")
 		}
-	}
-	mf, e := manifest.Find(".")
-	if e != nil {
-		return e
 	}
 	r, e := state.Read()
 	if e != nil {
 		return e
 	}
-	p := state.FindByManifest(r, mf)
+	var p *state.Project
+	if selector != "" {
+		p = state.FindByName(r, selector)
+		if p == nil {
+			if _, statErr := os.Stat(selector); statErr != nil {
+				return fmt.Errorf("project %q is not registered", selector)
+			}
+			mf, findErr := manifest.Find(selector)
+			if findErr != nil {
+				return findErr
+			}
+			p = state.FindByManifest(r, mf)
+		}
+	} else {
+		mf, findErr := manifest.Find(".")
+		if findErr != nil {
+			return findErr
+		}
+		p = state.FindByManifest(r, mf)
+	}
 	if p == nil {
 		return errors.New("project has no logs")
 	}
@@ -309,9 +349,10 @@ func logs(args []string, out io.Writer) error {
 		return errors.New("no background logs found")
 	}
 	offsets := map[string]int64{}
+	color := logview.Enabled(out)
 	for _, f := range files {
 		b, _ := os.ReadFile(f)
-		_, _ = out.Write(b)
+		_ = logview.Write(out, b, color)
 		offsets[f] = int64(len(b))
 	}
 	if follow {
@@ -329,7 +370,7 @@ func logs(args []string, out io.Writer) error {
 				b, e := io.ReadAll(io.NewSectionReader(fh, offsets[f], 1<<20))
 				_ = fh.Close()
 				if e == nil && len(b) > 0 {
-					_, _ = out.Write(b)
+					_ = logview.Write(out, b, color)
 					offsets[f] += int64(len(b))
 				}
 			}
@@ -357,7 +398,7 @@ func supervisorAlive(p *state.Project) bool {
 	return len(fields) > 0 && strings.Contains(filepath.Base(fields[0]), "serve-them")
 }
 func enable(path string, on bool, out io.Writer) error {
-	mf, e := manifest.Find(path)
+	mf, e := resolveManifest(path)
 	if e != nil {
 		return e
 	}
@@ -907,14 +948,15 @@ Usage:
 
 Project commands:
   init                                    Create serve.yaml in the current directory.
-  start [path]                            Start a project in the background.
-  stop [path]                             Stop a background project.
-  restart [path]                          Restart a background project.
-  status [path]                           Show project and service status.
-  logs [web|api] [--follow]               Stream or print project logs.
-  open [path]                             Open the project URL in a browser.
-  enable [path]                           Start the project after user login.
-  disable [path]                          Disable startup after user login.
+  start [project-name|path]               Start a project in the background.
+  stop [project-name|path]                Stop a background project.
+  restart [project-name|path]             Restart a background project.
+  status [project-name|path]              Show project and service status.
+  logs [project-name|path] [web|api] [--follow]
+                                          Stream or print project logs.
+  open [project-name|path]                Open the project URL in a browser.
+  enable [project-name|path]              Start the project after user login.
+  disable [project-name|path]             Disable startup after user login.
 
 Global commands:
   list [--enabled]                        List registered projects.

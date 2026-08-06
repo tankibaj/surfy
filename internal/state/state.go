@@ -160,6 +160,14 @@ func FindByManifest(r *Registry, manifest string) *Project {
 	id := ProjectID(manifest)
 	return r.Projects[id]
 }
+func FindByName(r *Registry, name string) *Project {
+	for _, p := range r.Projects {
+		if p.Name == name {
+			return p
+		}
+	}
+	return nil
+}
 func Sorted(r *Registry) []*Project {
 	out := make([]*Project, 0, len(r.Projects))
 	for _, p := range r.Projects {
