@@ -1,0 +1,5 @@
+/bin/
+/dist/
+/.serve-them-state/
+*.log
+.DS_Store
