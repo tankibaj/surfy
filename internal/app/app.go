@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -105,6 +106,20 @@ func Run(args []string, out, errOut io.Writer) error {
 		_ = os.Setenv("SERVE_THEM_CERT_DIR", certDir)
 		_, _, e := cert.EnsureCA()
 		return e
+	case "_migrate-user-state":
+		if len(rest) != 0 {
+			return errors.New("internal user state migration takes no arguments")
+		}
+		if os.Geteuid() != 0 {
+			return errors.New("user state migration must run as root")
+		}
+		identity, e := validatedInvokingUser(os.Getenv, lookupDarwinUser)
+		if e != nil {
+			return e
+		}
+		return migrateLegacyUserState(identity.home, identity.uid, identity.gid, nil, func(file *os.File, uid, gid int) error {
+			return file.Chown(uid, gid)
+		})
 	case "edge":
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
@@ -410,8 +425,21 @@ func installMode(out io.Writer, repair bool) error {
 	if e != nil {
 		return e
 	}
-	if e = ensureUserStateDir(d); e != nil {
-		return fmt.Errorf("prepare user state: %w; repair an existing install with sudo chown -R \"$USER\":staff %q", e, d)
+	home, e := os.UserHomeDir()
+	if e != nil {
+		return e
+	}
+	if e = prepareUserStateDirWith(d, home, ensureUserStateDir, func() error {
+		c := exec.Command("sudo", exe, "_migrate-user-state")
+		c.Stdin = os.Stdin
+		c.Stdout = out
+		c.Stderr = os.Stderr
+		if runErr := c.Run(); runErr != nil {
+			return fmt.Errorf("sudo user state migration: %w", runErr)
+		}
+		return nil
+	}); e != nil {
+		return fmt.Errorf("prepare user state: %w", e)
 	}
 	tmp, e := os.CreateTemp("", "serve-them-edge-*.plist")
 	if e != nil {
@@ -591,6 +619,192 @@ func ensureUserStateDir(dir string) error {
 			return e
 		}
 		_ = f.Close()
+	}
+	return nil
+}
+
+type invokingUser struct {
+	uid  int
+	gid  int
+	home string
+}
+
+func lookupDarwinUser(id string) (*user.User, error) {
+	record, err := exec.Command("/usr/bin/id", "-P", id).Output()
+	if err != nil {
+		return nil, fmt.Errorf("query macOS account %s: %w", id, err)
+	}
+	return parseDarwinUserRecord(string(record))
+}
+
+func parseDarwinUserRecord(record string) (*user.User, error) {
+	fields := strings.Split(strings.TrimSpace(record), ":")
+	if len(fields) != 10 || fields[0] == "" || fields[2] == "" || fields[3] == "" || fields[8] == "" {
+		return nil, errors.New("macOS account record is malformed")
+	}
+	return &user.User{Username: fields[0], Uid: fields[2], Gid: fields[3], Name: fields[7], HomeDir: fields[8]}, nil
+}
+
+func validatedInvokingUser(getenv func(string) string, lookup func(string) (*user.User, error)) (invokingUser, error) {
+	uidText := getenv("SUDO_UID")
+	gidText := getenv("SUDO_GID")
+	uid64, uidErr := strconv.ParseUint(uidText, 10, 31)
+	gid64, gidErr := strconv.ParseUint(gidText, 10, 31)
+	if uidErr != nil || uid64 == 0 || strconv.FormatUint(uid64, 10) != uidText {
+		return invokingUser{}, errors.New("user state migration requires a valid non-root SUDO_UID")
+	}
+	if gidErr != nil || gid64 == 0 || strconv.FormatUint(gid64, 10) != gidText {
+		return invokingUser{}, errors.New("user state migration requires a valid non-root SUDO_GID")
+	}
+	account, err := lookup(uidText)
+	if err != nil {
+		return invokingUser{}, fmt.Errorf("look up invoking user: %w", err)
+	}
+	accountUID, uidErr := strconv.ParseUint(account.Uid, 10, 31)
+	accountGID, gidErr := strconv.ParseUint(account.Gid, 10, 31)
+	if uidErr != nil || gidErr != nil || accountUID != uid64 || accountGID != gid64 {
+		return invokingUser{}, errors.New("SUDO_UID and SUDO_GID do not match the invoking account")
+	}
+	home := filepath.Clean(account.HomeDir)
+	if !filepath.IsAbs(account.HomeDir) || home == string(filepath.Separator) {
+		return invokingUser{}, errors.New("invoking account has an invalid home directory")
+	}
+	return invokingUser{uid: int(uid64), gid: int(gid64), home: home}, nil
+}
+
+func canonicalMacOSStateDir(home string) string {
+	return filepath.Join(filepath.Clean(home), "Library", "Application Support", "serve-them")
+}
+
+func prepareUserStateDirWith(dir, home string, prepare func(string) error, migrate func() error) error {
+	err := prepare(dir)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, os.ErrPermission) || filepath.Clean(dir) != canonicalMacOSStateDir(home) {
+		return err
+	}
+	if err = migrate(); err != nil {
+		return err
+	}
+	return prepare(dir)
+}
+
+func migrateLegacyUserState(home string, uid, gid int, beforeOpen func(*os.Root, string) error, chown func(*os.File, int, int) error) error {
+	if uid <= 0 || gid <= 0 || !filepath.IsAbs(home) {
+		return errors.New("invalid invoking user identity")
+	}
+	home = filepath.Clean(home)
+	if home == string(filepath.Separator) {
+		return errors.New("invalid invoking user home directory")
+	}
+	resolvedHome, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		return fmt.Errorf("resolve invoking user home directory: %w", err)
+	}
+	if resolvedHome != home {
+		return errors.New("invoking user home directory must not contain symlinks")
+	}
+	dir := canonicalMacOSStateDir(home)
+	var stateInfo os.FileInfo
+	for _, path := range []string{home, filepath.Join(home, "Library"), filepath.Join(home, "Library", "Application Support"), dir} {
+		info, err := os.Lstat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("user state path component must not be a symlink: %s", path)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("user state path component must be a directory: %s", path)
+		}
+		if path == dir {
+			stateInfo = info
+		}
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return fmt.Errorf("open user state directory: %w", err)
+	}
+	defer root.Close()
+	openedInfo, err := root.Lstat(".")
+	if err != nil {
+		return fmt.Errorf("verify user state directory: %w", err)
+	}
+	if !os.SameFile(stateInfo, openedInfo) {
+		return errors.New("user state directory changed during migration")
+	}
+	dirFile, err := root.Open(".")
+	if err != nil {
+		return fmt.Errorf("open user state directory descriptor: %w", err)
+	}
+	defer dirFile.Close()
+	dirFileInfo, err := dirFile.Stat()
+	if err != nil {
+		return fmt.Errorf("inspect user state directory descriptor: %w", err)
+	}
+	if !os.SameFile(stateInfo, dirFileInfo) {
+		return errors.New("opened user state directory does not match the validated directory")
+	}
+	type openedStateFile struct {
+		name string
+		file *os.File
+	}
+	var openedFiles []openedStateFile
+	defer func() {
+		for _, opened := range openedFiles {
+			_ = opened.file.Close()
+		}
+	}()
+	for _, name := range []string{"registry.json", "registry.lock", "registry.json.tmp", "supervisor.log"} {
+		info, err := root.Lstat(name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s must not be a symlink", name)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%s must be a regular file", name)
+		}
+		if beforeOpen != nil {
+			if err = beforeOpen(root, name); err != nil {
+				return fmt.Errorf("before opening %s: %w", name, err)
+			}
+		}
+		file, err := root.OpenFile(name, os.O_RDONLY, 0)
+		if err != nil {
+			return fmt.Errorf("open %s: %w", name, err)
+		}
+		openedInfo, err := file.Stat()
+		if err != nil {
+			_ = file.Close()
+			return fmt.Errorf("inspect opened %s: %w", name, err)
+		}
+		if !os.SameFile(info, openedInfo) {
+			_ = file.Close()
+			return fmt.Errorf("%s changed during migration", name)
+		}
+		stat, ok := openedInfo.Sys().(*syscall.Stat_t)
+		if !ok || stat.Nlink != 1 {
+			_ = file.Close()
+			return fmt.Errorf("%s must have exactly one hard link", name)
+		}
+		openedFiles = append(openedFiles, openedStateFile{name: name, file: file})
+	}
+	for _, opened := range openedFiles {
+		if err = chown(opened.file, uid, gid); err != nil {
+			return fmt.Errorf("change ownership of %s: %w", opened.name, err)
+		}
+	}
+	if err := chown(dirFile, uid, gid); err != nil {
+		return fmt.Errorf("change ownership of user state directory: %w", err)
 	}
 	return nil
 }
