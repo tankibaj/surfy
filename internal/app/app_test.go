@@ -1,13 +1,27 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/user"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestHelpDescribesCommands(t *testing.T) {
+	var out bytes.Buffer
+	if err := Run([]string{"--help"}, &out, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"serve-them [path]", "start [path]", "Start a project in the background.", "logs [web|api] [--follow]", "Stream or print project logs.", "certificate status", "Show local certificate authority status.", "uninstall [--remove-ca]", "Remove Serve Them and optionally its trusted CA."} {
+		if !strings.Contains(out.String(), expected) {
+			t.Errorf("help does not contain %q:\n%s", expected, out.String())
+		}
+	}
+}
 
 func TestEnsureUserStateDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "custom", "serve-them")

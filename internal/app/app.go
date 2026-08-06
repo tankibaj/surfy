@@ -890,10 +890,30 @@ func certificate(args []string, out io.Writer) error {
 func usage(w io.Writer) {
 	fmt.Fprintln(w, `Serve Them — local multi-application HTTPS runtime
 
-Usage: serve-them [command] [path]
+Usage:
+  serve-them [path]                       Start a project in the foreground.
+  serve-them <command> [options] [path]
 
-Commands: start, stop, restart, status, list, logs, open, enable, disable,
-          doctor, certificate status|repair, install, uninstall, edge, version`)
+Project commands:
+  start [path]                            Start a project in the background.
+  stop [path]                             Stop a background project.
+  restart [path]                          Restart a background project.
+  status [path]                           Show project and service status.
+  logs [web|api] [--follow]               Stream or print project logs.
+  open [path]                             Open the project URL in a browser.
+  enable [path]                           Start the project after user login.
+  disable [path]                          Disable startup after user login.
+
+Global commands:
+  list [--enabled]                        List registered projects.
+  doctor                                 Diagnose the local installation.
+  certificate status                     Show local certificate authority status.
+  certificate repair                     Repair certificate authority trust.
+  install                                Install the HTTPS edge and trusted CA.
+  uninstall [--remove-ca]                Remove Serve Them and optionally its trusted CA.
+  edge                                   Run the HTTPS edge service.
+  version                                Print the installed version.
+  help                                   Show this help.`)
 }
 
 var _ = strconv.Itoa
