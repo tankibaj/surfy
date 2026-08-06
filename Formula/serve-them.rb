@@ -1,9 +1,9 @@
 class ServeThem < Formula
   desc "Local multi-application HTTPS runtime"
   homepage "https://github.com/tankibaj/server-them"
-  version "0.1.1"
-  url "https://github.com/tankibaj/server-them/releases/download/v0.1.1/serve-them_0.1.1_darwin_arm64.tar.gz"
-  sha256 "090562a0380be3417877e862d826d5fa460b79ac984490fe89f1f52e3245184e"
+  version "0.1.2"
+  url "https://github.com/tankibaj/server-them/releases/download/v0.1.2/serve-them_0.1.2_darwin_arm64.tar.gz"
+  sha256 "04ad65f389fd77a67bc599661b4fe726a81ed098bb5a50ac598d19066a673f3a"
 
   depends_on :macos
   depends_on arch: :arm64
