@@ -410,6 +410,9 @@ func installMode(out io.Writer, repair bool) error {
 	if e != nil {
 		return e
 	}
+	if e = ensureUserStateDir(d); e != nil {
+		return fmt.Errorf("prepare user state: %w; repair an existing install with sudo chown -R \"$USER\":staff %q", e, d)
+	}
 	tmp, e := os.CreateTemp("", "serve-them-edge-*.plist")
 	if e != nil {
 		return e
@@ -554,6 +557,42 @@ func removeTrustedCAs() error {
 		}
 	}
 	return errors.New("too many Serve Them certificates remain in the System Keychain")
+}
+
+func ensureUserStateDir(dir string) error {
+	if !filepath.IsAbs(dir) {
+		return errors.New("state directory must be absolute")
+	}
+	if st, e := os.Lstat(dir); e == nil && st.Mode()&os.ModeSymlink != 0 {
+		return errors.New("state directory must not be a symlink")
+	} else if e != nil && !errors.Is(e, os.ErrNotExist) {
+		return e
+	}
+	if e := os.MkdirAll(dir, 0700); e != nil {
+		return e
+	}
+	if e := os.Chmod(dir, 0700); e != nil {
+		return e
+	}
+	for _, name := range []string{"registry.json", "registry.lock", "registry.json.tmp"} {
+		path := filepath.Join(dir, name)
+		st, e := os.Lstat(path)
+		if errors.Is(e, os.ErrNotExist) {
+			continue
+		}
+		if e != nil {
+			return e
+		}
+		if st.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s must not be a symlink", name)
+		}
+		f, e := os.OpenFile(path, os.O_RDWR, 0)
+		if e != nil {
+			return e
+		}
+		_ = f.Close()
+	}
+	return nil
 }
 
 func xmlEscape(s string) string {

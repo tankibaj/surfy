@@ -3,3 +3,5 @@
 /.serve-them-state/
 *.log
 .DS_Store
+!internal/manifest/
+!internal/manifest/*.go

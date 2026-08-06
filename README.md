@@ -22,6 +22,8 @@ For the optimized Apple Silicon release binary:
 make build-apple-silicon
 ```
 
+Maintainers release by pushing a matching version tag (for example `v0.1.1`). GitHub Actions verifies and cross-builds the native ARM64 archive, publishes the release, and updates the Homebrew formula checksum on `main`.
+
 The project is then available at `https://<directory-name>.localhost`; `/` is sent to `web`, and `/api/*` is sent unchanged to `api`. The backend application owns the `/api` route.
 
 ## MVP commands
@@ -55,7 +57,7 @@ api:
   path: ./backend
   run: ./server --host 127.0.0.1 --port ${PORT}
   env:
-    ENV_FILE: ./backend/.env
+    ENV_FILE: ./.env
 ```
 
 Registry data lives in `~/Library/Application Support/serve-them`, and logs in `~/Library/Logs/serve-them`. The trusted root certificate is installed in the macOS System Keychain; root-only CA and host key material lives in `/Library/Application Support/serve-them/certificates`. Secret environment values are passed directly to child processes and are never written to the registry.
