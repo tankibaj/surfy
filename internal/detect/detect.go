@@ -3,9 +3,11 @@ package detect
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/tankibaj/server-them/internal/manifest"
@@ -90,24 +92,101 @@ func node(dir string, port int) (Result, error) {
 }
 
 func python(dir string, port int) (Result, error) {
-	entries, _ := filepath.Glob(filepath.Join(dir, "*.py"))
-	reFast := regexp.MustCompile(`(?m)^\s*app\s*=\s*FastAPI\s*\(`)
-	reFlask := regexp.MustCompile(`(?m)^\s*app\s*=\s*Flask\s*\(`)
-	var matches []Result
-	for _, f := range entries {
-		b, _ := os.ReadFile(f)
-		mod := strings.TrimSuffix(filepath.Base(f), ".py")
+	type match struct{ framework, module string }
+	var matches []match
+	reFast := regexp.MustCompile(`(?m)^\s*app(?:\s*:[^=]+)?\s*=\s*FastAPI\s*\(`)
+	reFlask := regexp.MustCompile(`(?m)^\s*app(?:\s*:[^=]+)?\s*=\s*Flask\s*\(`)
+	excluded := map[string]bool{".venv": true, "venv": true, "env": true, ".git": true, "__pycache__": true, "site-packages": true, "tests": true, "test": true, "migrations": true}
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, e := filepath.Rel(dir, path)
+		if e != nil {
+			return e
+		}
+		parts := strings.Split(rel, string(filepath.Separator))
+		if entry.IsDir() {
+			if rel != "." && (excluded[entry.Name()] || len(parts) > 4) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(entry.Name()) != ".py" || len(parts) > 4 {
+			return nil
+		}
+		module, ok := pythonModule(parts)
+		if !ok {
+			return nil
+		}
+		b, e := os.ReadFile(path)
+		if e != nil {
+			return e
+		}
 		if reFast.Match(b) {
-			matches = append(matches, Result{fmt.Sprintf("python3 -m uvicorn %s:app --host 127.0.0.1 --port %d", mod, port), "FastAPI", "confident"})
+			matches = append(matches, match{"FastAPI", module})
 		}
 		if reFlask.Match(b) {
-			matches = append(matches, Result{fmt.Sprintf("python3 -m flask --app %s:app run --host 127.0.0.1 --port %d", mod, port), "Flask", "confident"})
+			matches = append(matches, match{"Flask", module})
+		}
+		return nil
+	})
+	if err != nil {
+		return Result{}, fmt.Errorf("inspect Python project: %w", err)
+	}
+	if len(matches) == 0 {
+		return Result{}, fmt.Errorf("unable to identify a FastAPI or Flask application entry point; add a run override")
+	}
+	if len(matches) > 1 {
+		modules := make([]string, 0, len(matches))
+		for _, m := range matches {
+			modules = append(modules, m.module+":app")
+		}
+		sort.Strings(modules)
+		return Result{}, fmt.Errorf("Python application entry point is ambiguous (%s); add a run override", strings.Join(modules, ", "))
+	}
+	m := matches[0]
+	if m.framework == "FastAPI" {
+		runner := pythonRunner(dir, "uvicorn")
+		return Result{fmt.Sprintf("%s %s:app --host 127.0.0.1 --port %d --reload", runner, m.module, port), "FastAPI", "confident"}, nil
+	}
+	runner := pythonRunner(dir, "flask")
+	return Result{fmt.Sprintf("%s --app %s:app run --host 127.0.0.1 --port %d", runner, m.module, port), "Flask", "confident"}, nil
+}
+
+func pythonModule(parts []string) (string, bool) {
+	last := parts[len(parts)-1]
+	parts[len(parts)-1] = strings.TrimSuffix(last, ".py")
+	if parts[len(parts)-1] == "__init__" {
+		parts = parts[:len(parts)-1]
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	identifier := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	for _, part := range parts {
+		if !identifier.MatchString(part) {
+			return "", false
 		}
 	}
-	if len(matches) == 1 {
-		return matches[0], nil
+	return strings.Join(parts, "."), true
+}
+func pythonRunner(dir, tool string) string {
+	for _, venv := range []string{".venv", "venv"} {
+		toolPath := filepath.Join(dir, venv, "bin", tool)
+		if executable(toolPath) {
+			return "./" + filepath.ToSlash(filepath.Join(venv, "bin", tool))
+		}
+		pythonPath := filepath.Join(dir, venv, "bin", "python")
+		if executable(pythonPath) {
+			return "./" + filepath.ToSlash(filepath.Join(venv, "bin", "python")) + " -m " + tool
+		}
 	}
-	return Result{}, fmt.Errorf("Python application entry point is ambiguous; add a run override")
+	return "python3 -m " + tool
+}
+func executable(path string) bool {
+	info, e := os.Stat(path)
+	return e == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
 }
 
 func expandPort(s string, port int) string { return strings.ReplaceAll(s, "${PORT}", fmt.Sprint(port)) }

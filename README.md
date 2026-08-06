@@ -84,17 +84,18 @@ Omit `--remove-ca` to preserve the trusted local CA for a later reinstall.
 ## Detection
 
 - Node.js: package-manager metadata/lockfiles, then `dev` or `start`; Vite receives explicit loopback host and port flags.
-- Python: Django, or an unambiguous `FastAPI()`/`Flask()` module.
+- Python: Django, or an unambiguous `FastAPI()`/`Flask()` module up to four package levels deep. Local `.venv`/`venv` executables are preferred automatically; FastAPI runs with reload enabled.
 - Go: `go run .`.
 - Anything else: specify `run`; `${PORT}` is expanded at startup.
 
 ```yaml
 api:
   path: ./backend
-  run: ./server --host 127.0.0.1 --port ${PORT}
   env:
     ENV_FILE: ./.env
 ```
+
+For example, `backend/app/main.py` containing `app = FastAPI()` is started as `app.main:app`; no `run` override is required.
 
 Registry data lives in `~/Library/Application Support/serve-them`, and logs in `~/Library/Logs/serve-them`. The trusted root certificate is installed in the macOS System Keychain; root-only CA and host key material lives in `/Library/Application Support/serve-them/certificates`. Secret environment values are passed directly to child processes and are never written to the registry.
 
