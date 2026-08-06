@@ -45,6 +45,18 @@ serve-them uninstall [--remove-ca]      Remove Serve Them and optionally its tru
 
 `install` is macOS-only in the first release. It creates and trusts a private local CA and installs the narrowly scoped edge service on ports 80 and 443. Application commands always run as the current, unprivileged user. `enable` uses a per-user LaunchAgent and starts the project only after login.
 
+## Uninstall
+
+Remove the edge service, trusted local CA, Homebrew package, and tap in this order:
+
+```sh
+serve-them uninstall --remove-ca
+brew uninstall serve-them
+brew untap tankibaj/server-them
+```
+
+Omit `--remove-ca` to preserve the trusted local CA for a later reinstall.
+
 ## Detection
 
 - Node.js: package-manager metadata/lockfiles, then `dev` or `start`; Vite receives explicit loopback host and port flags.
