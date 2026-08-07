@@ -1,81 +1,131 @@
 # Surfy
 
-Surfy is a dependency-free Go CLI for running local frontend and backend applications behind stable, trusted HTTPS `.localhost` URLs. The first release targets Apple Silicon Macs (M1 and newer).
+[![CI](https://github.com/tankibaj/surfy/actions/workflows/ci.yml/badge.svg)](https://github.com/tankibaj/surfy/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/tankibaj/surfy)](https://github.com/tankibaj/surfy/releases/latest)
+
+**Give every local app a stable, trusted HTTPS address.**
+
+Surfy runs your frontend and backend together at a memorable `.localhost` URL—without port hunting, certificate warnings, or separate process-manager setup.
+
+```text
+https://my-project.localhost          → frontend
+https://my-project.localhost/api/*    → backend, path preserved
+```
+
+## Quick start
+
+Surfy currently supports Apple Silicon Macs (M1 or newer) and installs through Homebrew.
+
+```sh
+# 1. Install Surfy
+brew tap tankibaj/surfy https://github.com/tankibaj/surfy
+brew install tankibaj/surfy/surfy
+
+# 2. Set up trusted local HTTPS once
+surfy install
+
+# 3. Start a project
+cd path/to/my-project
+surfy init
+surfy start
+```
+
+![Terminal showing surfy start and the HTTPS URL to visit](docs/assets/surfy-start.svg)
+
+Open the URL Surfy prints, or run `surfy open` to launch it in your browser.
+
+`surfy install` requests macOS administrator authorization to install the shared HTTPS edge and trust Surfy's private local certificate authority. Project processes still run as your normal user.
+
+### Already have a manifest?
+
+Create `surfy.yaml` in the project root, then run `surfy start`:
 
 ```yaml
-# surfy.yaml
 web: ./frontend
 api: ./backend
 ```
 
-```sh
-brew tap tankibaj/surfy https://github.com/tankibaj/surfy
-brew install tankibaj/surfy/surfy
-surfy install # one macOS administrator authorization
+The directory name becomes the hostname by default. Add `name: my-app` to choose a different one.
+
+## How it works
+
+```mermaid
+flowchart LR
+    developer["Developer"] -->|"surfy start"| supervisor["Project supervisor"]
+    supervisor -->|"Starts"| web["Frontend app"]
+    supervisor -->|"Starts"| api["Backend app"]
+    supervisor -->|"Registers routes"| registry["Local route registry"]
+
+    browser["Browser"] -->|"Trusted HTTPS"| edge["Surfy HTTPS edge"]
+    registry -->|"Route lookup"| edge
+    edge -->|"/"| web
+    edge -->|"/api/*"| api
 ```
 
-The formula installs the native Apple Silicon CLI into Homebrew’s managed prefix (`/opt/homebrew/bin` through its stable symlink). For a user-local installation without Homebrew, run `make install-user` and add `~/.local/bin` to `PATH`.
+One root-owned edge listens only on `127.0.0.1:80` and `127.0.0.1:443`. Each project gets an unprivileged supervisor that starts its services on available loopback ports and registers their routes. The edge terminates TLS and sends each request to the correct project service.
 
-## Version 0.1 clean break
+## What Surfy detects
 
-Version 0.1.0 is Surfy's first release and has no automatic compatibility migration from the archived predecessor. Before installing Surfy, remove any previous edge service, login agents, and local CA with the original CLI. Rename each project manifest to `surfy.yaml`; previous state directories and environment-variable names are not read by Surfy.
+| Runtime | Automatic behavior |
+| --- | --- |
+| Node.js | Detects package-manager metadata and runs `dev` or `start`; Vite receives loopback host and port flags. |
+| Python | Detects Django, Flask, and FastAPI; local `.venv` or `venv` executables are preferred. |
+| Go | Runs the project with `go run .`. |
+| Anything else | Use an explicit `run` command with `${PORT}` in `surfy.yaml`. |
 
-For the optimized Apple Silicon release binary:
-
-```sh
-make build-apple-silicon
-```
-
-After CI succeeds for a merge or push to `main`, GitHub Actions verifies and cross-builds any unpublished version, creates its version tag and release, and updates the Homebrew formula checksum on `main`.
-
-The project is then available at `https://<directory-name>.localhost`; `/` is sent to `web`, and `/api/*` is sent unchanged to `api`. The backend application owns the `/api` route.
-
-## MVP commands
-
-```text
-surfy                              Start a project in the foreground.
-surfy init                         Create surfy.yaml in the current directory.
-surfy start [project-name|path]    Start a project in the background.
-surfy stop|restart [project-name|path]
-                                        Stop or restart a background project.
-surfy status [project-name|path]   Show project and service status.
-surfy list [--enabled]             List registered or login-enabled projects.
-surfy logs [project-name|path] [web|api] [--follow]
-                                        Print or follow project logs.
-surfy open [project-name|path]     Open the project URL in a browser.
-surfy enable|disable [project-name|path]
-                                        Enable or disable startup after user login.
-surfy doctor                       Diagnose the local installation.
-surfy certificate status|repair    Inspect or repair certificate authority trust.
-surfy install                      Install the HTTPS edge and trusted CA.
-surfy uninstall [--remove-ca]      Remove Surfy and optionally its trusted CA.
-```
-
-`surfy init` detects supported root or `frontend`/`backend` layouts and writes a commented manifest. It never overwrites an existing `surfy.yaml` and never reads `.env` contents.
+Example with an explicit backend command:
 
 ```yaml
-# Generated by surfy init.
-# Paths are relative to this file.
-
-# Frontend application. Surfy assigns its internal port.
+name: storefront
 web: ./frontend
-
-# Backend application. ${PORT} is assigned automatically.
 api:
   path: ./backend
   run: ./.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port ${PORT} --reload
   env:
-    # Path is passed through; Surfy never reads this file.
     ENV_FILE: ./.env
 ```
 
-Combined logs use stable per-service colors and severity markers (`·` debug, `ℹ` info, `⚠` warning, `✖` error/fatal). Set `NO_COLOR=1` to disable ANSI colors while retaining the indicators. Future service names receive deterministic colors.
+Surfy passes environment values directly to child processes and never stores resolved secrets in its registry.
 
-`install` is macOS-only in the first release. It creates and trusts a private local CA and installs the narrowly scoped edge service on ports 80 and 443. Application commands always run as the current, unprivileged user. `enable` uses a per-user LaunchAgent and starts the project only after login.
+## Everyday commands
+
+```text
+surfy                                  Run the current project in the foreground
+surfy init                             Create surfy.yaml from detected services
+surfy start [project-name|path]        Start a project in the background
+surfy stop [project-name|path]         Stop a project
+surfy restart [project-name|path]      Restart a project
+surfy status [project-name|path]       Show project and service status
+surfy logs [project-name|path]         Print combined project logs
+surfy logs [project-name|path] api -f  Follow only backend logs
+surfy open [project-name|path]         Open the project URL
+surfy list                             List registered projects
+```
+
+Run `surfy help` for the complete command reference, including login startup and certificate management.
+
+## Start projects at login
+
+```sh
+surfy enable my-project
+surfy disable my-project
+```
+
+Enabled projects run after you sign in, under your user account.
+
+## Troubleshooting
+
+```sh
+surfy doctor
+surfy status
+surfy logs
+surfy certificate status
+surfy certificate repair
+```
+
+State is stored in `~/Library/Application Support/surfy`, with logs in `~/Library/Logs/surfy`.
 
 ## Uninstall
-
-Remove the edge service, trusted local CA, Homebrew package, and tap in this order:
 
 ```sh
 surfy uninstall --remove-ca
@@ -83,28 +133,17 @@ brew uninstall surfy
 brew untap tankibaj/surfy
 ```
 
-Omit `--remove-ca` to preserve the trusted local CA for a later reinstall.
+Omit `--remove-ca` if you want to preserve the local certificate authority for a later reinstall.
 
-## Detection
+## Migrating from the predecessor
 
-- Node.js: package-manager metadata/lockfiles, then `dev` or `start`; Vite receives explicit loopback host and port flags.
-- Python: Django, or an unambiguous `FastAPI()`/`Flask()` module up to four package levels deep. Local `.venv`/`venv` executables are preferred automatically; FastAPI runs with reload enabled.
-- Go: `go run .`.
-- Anything else: specify `run`; `${PORT}` is expanded at startup.
+Surfy 0.1 is a clean break and does not automatically migrate predecessor services, state, environment variables, or manifests. Remove the previous edge service with its original CLI before installing Surfy, then rename project manifests to `surfy.yaml`.
 
-```yaml
-api:
-  path: ./backend
-  env:
-    ENV_FILE: ./.env
+## For contributors
+
+```sh
+make check
+make build-apple-silicon
 ```
 
-For example, `backend/app/main.py` containing `app = FastAPI()` is started as `app.main:app`; no `run` override is required.
-
-Registry data lives in `~/Library/Application Support/surfy`, and logs in `~/Library/Logs/surfy`. The trusted root certificate is installed in the macOS System Keychain; root-only CA and host key material lives in `/Library/Application Support/surfy/certificates`. Secret environment values are passed directly to child processes and are never written to the registry.
-
-## Architecture
-
-The root-owned edge helper only terminates TLS, issues local certificates through a restricted Unix socket, and proxies registered routes. Per-project supervisors allocate loopback ports and execute application commands under the invoking user. The edge reloads the user-owned registry for each request, so projects can be added and removed without restarting it.
-
-For local non-privileged edge testing, set `SURFY_HTTP_ADDR=:8080`, `SURFY_HTTPS_ADDR=:8443`, and `SURFY_STATE_DIR` before running `surfy edge`.
+Successful CI on `main` publishes an unpublished version, creates its GitHub tag and release, and writes the release checksum back to the Homebrew formula.

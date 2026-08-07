@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="360" viewBox="0 0 1000 360" role="img" aria-labelledby="title description">
+  <title id="title">Start a project with Surfy</title>
+  <desc id="description">A terminal runs surfy start. Surfy confirms that my-project started and prints https://my-project.localhost to visit.</desc>
+  <defs>
+    <linearGradient id="terminalBackground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#07111f"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="42" width="880" height="276" rx="18" fill="url(#terminalBackground)"/>
+    <path d="M60 60a18 18 0 0 1 18-18h844a18 18 0 0 1 18 18v42H60z" fill="#1f2937"/>
+  </g>
+
+  <circle cx="94" cy="72" r="8" fill="#fb7185"/>
+  <circle cx="120" cy="72" r="8" fill="#fbbf24"/>
+  <circle cx="146" cy="72" r="8" fill="#34d399"/>
+  <text x="500" y="78" text-anchor="middle" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="600">my-project — terminal</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="25">
+    <text x="100" y="154" fill="#2dd4bf">$</text>
+    <text x="128" y="154" fill="#f8fafc">surfy start</text>
+
+    <circle cx="111" cy="208" r="12" fill="#34d399"/>
+    <path d="m105 208 4 4 8-9" fill="none" stroke="#052e2b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="136" y="216" fill="#d1fae5">my-project started</text>
+
+    <text x="136" y="268" fill="#7dd3fc">https://my-project.localhost</text>
+  </g>
+
+</svg>
