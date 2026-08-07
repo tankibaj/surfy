@@ -87,6 +87,37 @@ api:
 
 Surfy passes environment values directly to child processes and never stores resolved secrets in its registry.
 
+### Project dependencies and lifecycle hooks
+
+Use ordered lifecycle hooks when a project needs local infrastructure such as
+PostgreSQL or Redis:
+
+```yaml
+name: storefront
+
+before_start:
+  - docker compose up -d --wait database
+  - npm run db:migrate
+
+after_stop:
+  - docker compose stop database
+
+web: ./frontend
+api: ./backend
+```
+
+Hooks run from the directory containing `surfy.yaml` and inherit the environment
+used to launch Surfy. `before_start` runs before either application service and
+stops at the first failure. `after_stop` runs after application services exit
+and attempts every command even if an earlier cleanup command fails. Each hook
+phase has a 60-second timeout. `surfy restart` runs `after_stop`, followed by
+`before_start` as part of the new start.
+
+Lifecycle hooks execute arbitrary shell commands with the current user's
+permissions. Keep secrets in the environment rather than writing them in the
+manifest. Avoid stopping shared infrastructure from `after_stop`; only manage
+dependencies owned by that project.
+
 ## Everyday commands
 
 ```text

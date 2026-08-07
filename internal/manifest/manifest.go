@@ -16,10 +16,12 @@ type Service struct {
 	Env  map[string]string
 }
 type Manifest struct {
-	File string
-	Name string
-	Web  *Service
-	API  *Service
+	File        string
+	Name        string
+	BeforeStart []string
+	AfterStop   []string
+	Web         *Service
+	API         *Service
 }
 
 var hostnameLabel = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -57,6 +59,11 @@ func Load(file string) (*Manifest, error) {
 	m := &Manifest{File: file}
 	var current *Service
 	section := ""
+	hookSections := map[string]*[]string{
+		"before_start": &m.BeforeStart,
+		"after_stop":   &m.AfterStop,
+	}
+	hookSeen := map[string]bool{}
 	s := bufio.NewScanner(f)
 	lineNo := 0
 	for s.Scan() {
@@ -68,6 +75,24 @@ func Load(file string) (*Manifest, error) {
 		indent := len(raw) - len(strings.TrimLeft(raw, " "))
 		if strings.Contains(raw[:indent], "\t") {
 			return nil, fmt.Errorf("%s:%d: tabs are not allowed", file, lineNo)
+		}
+		if indent == 2 {
+			if commands := hookSections[section]; commands != nil {
+				trimmed := strings.TrimSpace(raw)
+				if trimmed != "-" && !strings.HasPrefix(trimmed, "- ") {
+					return nil, fmt.Errorf("%s:%d: %s must be a command list", file, lineNo, section)
+				}
+				item := strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
+				item, err = scalar(item)
+				if err != nil {
+					return nil, fmt.Errorf("%s:%d: %w", file, lineNo, err)
+				}
+				if item == "" {
+					return nil, fmt.Errorf("%s:%d: %s commands must not be empty", file, lineNo, section)
+				}
+				*commands = append(*commands, item)
+				continue
+			}
 		}
 		key, value, ok := splitKV(strings.TrimSpace(raw))
 		if !ok {
@@ -83,6 +108,12 @@ func Load(file string) (*Manifest, error) {
 			switch key {
 			case "name":
 				m.Name = value
+			case "before_start", "after_stop":
+				if value != "" {
+					return nil, fmt.Errorf("%s:%d: %s must be a command list", file, lineNo, key)
+				}
+				section = key
+				hookSeen[key] = true
 			case "web", "api":
 				svc := &Service{Env: map[string]string{}}
 				if value != "" {
@@ -129,6 +160,11 @@ func Load(file string) (*Manifest, error) {
 	}
 	if err := s.Err(); err != nil {
 		return nil, err
+	}
+	for name, commands := range hookSections {
+		if hookSeen[name] && len(*commands) == 0 {
+			return nil, fmt.Errorf("%s must contain at least one command", name)
+		}
 	}
 	if m.Web == nil && m.API == nil {
 		return nil, errors.New("surfy.yaml must define web, api, or both")

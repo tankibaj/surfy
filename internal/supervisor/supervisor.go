@@ -40,6 +40,8 @@ type exitEvent struct {
 }
 type restartResult struct{ old, next *running }
 
+const hookPhaseTimeout = 60 * time.Second
+
 func Run(manifestFile string, background bool, out io.Writer) error {
 	m, err := manifest.Load(manifestFile)
 	if err != nil {
@@ -50,6 +52,7 @@ func Run(manifestFile string, background bool, out io.Writer) error {
 	defer stop()
 	events := make(chan exitEvent, 2)
 	var services []*running
+	lifecycleStarted := false
 	cleanup := func() {
 		for _, s := range services {
 			if s.cmd.Process != nil {
@@ -67,6 +70,11 @@ func Run(manifestFile string, background bool, out io.Writer) error {
 			}
 			if s.log != nil {
 				_ = s.log.Close()
+			}
+		}
+		if lifecycleStarted && len(m.AfterStop) > 0 {
+			if hookErr := runHooks(context.Background(), "after_stop", m.AfterStop, filepath.Dir(m.File), out, true); hookErr != nil {
+				fmt.Fprintf(out, "! %v\n", hookErr)
 			}
 		}
 		_ = state.Update(func(r *state.Registry) error {
@@ -107,6 +115,10 @@ func Run(manifestFile string, background bool, out io.Writer) error {
 		r.Projects[id] = &state.Project{ID: id, Name: m.Name, Manifest: m.File, Status: "starting", SupervisorPID: os.Getpid(), SupervisorMode: mode, Enabled: enabled, Updated: time.Now()}
 		return nil
 	}); err != nil {
+		return err
+	}
+	lifecycleStarted = true
+	if err = runHooks(ctx, "before_start", m.BeforeStart, filepath.Dir(m.File), out, false); err != nil {
 		return err
 	}
 	if err = cert.RequestHost(m.Name); err != nil {
@@ -228,6 +240,41 @@ func Run(manifestFile string, background bool, out io.Writer) error {
 			go recoverService(ctx, s, n, out, id, restarted)
 		}
 	}
+}
+
+func runHooks(ctx context.Context, phase string, commands []string, dir string, out io.Writer, continueOnError bool) error {
+	if len(commands) == 0 {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, hookPhaseTimeout)
+	defer cancel()
+	var failures []error
+	for i, command := range commands {
+		position := fmt.Sprintf("%d/%d", i+1, len(commands))
+		fmt.Fprintf(out, "→ %s command %s\n", phase, position)
+		cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+		cmd.Dir = dir
+		cmd.Stdout = out
+		cmd.Stderr = out
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.Cancel = func() error {
+			if cmd.Process == nil {
+				return nil
+			}
+			return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		}
+		cmd.WaitDelay = 3 * time.Second
+		if err := cmd.Run(); err != nil {
+			failure := fmt.Errorf("%s command %s failed: %w", phase, position, err)
+			failures = append(failures, failure)
+			if !continueOnError {
+				return failure
+			}
+			continue
+		}
+		fmt.Fprintf(out, "✓ %s command %s completed\n", phase, position)
+	}
+	return errors.Join(failures...)
 }
 
 func recoverService(ctx context.Context, s *running, attempt int, out io.Writer, id string, result chan<- restartResult) {

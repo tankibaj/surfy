@@ -27,6 +27,42 @@ func TestLoadShorthandAndMapping(t *testing.T) {
 		t.Fatalf("unexpected manifest: %#v", m)
 	}
 }
+
+func TestLoadLifecycleHooks(t *testing.T) {
+	d := t.TempDir()
+	f := filepath.Join(d, "surfy.yaml")
+	data := "name: demo-app\nbefore_start:\n  - docker compose up -d --wait database\n  - npm run db:migrate\nafter_stop:\n  - docker compose stop database\nweb: .\n"
+	if err := os.WriteFile(f, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(m.BeforeStart, "|"); got != "docker compose up -d --wait database|npm run db:migrate" {
+		t.Fatalf("before_start = %q", got)
+	}
+	if got := strings.Join(m.AfterStop, "|"); got != "docker compose stop database" {
+		t.Fatalf("after_stop = %q", got)
+	}
+}
+
+func TestRejectsMalformedLifecycleHooks(t *testing.T) {
+	d := t.TempDir()
+	f := filepath.Join(d, "surfy.yaml")
+	for _, data := range []string{
+		"before_start:\nweb: .\n",
+		"before_start:\n  command: docker compose up\nweb: .\n",
+		"before_start:\n  - \nweb: .\n",
+	} {
+		if err := os.WriteFile(f, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(f); err == nil || !strings.Contains(err.Error(), "before_start") {
+			t.Fatalf("expected before_start validation error for %q, got %v", data, err)
+		}
+	}
+}
 func TestRejectsInvalidNameAndUnknownField(t *testing.T) {
 	d := t.TempDir()
 	f := filepath.Join(d, "surfy.yaml")

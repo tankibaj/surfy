@@ -244,8 +244,13 @@ func stop(path string, out io.Writer) error {
 	if e = syscall.Kill(p.SupervisorPID, syscall.SIGTERM); e != nil {
 		return e
 	}
-	for i := 0; i < 50 && alive(p.SupervisorPID); i++ {
+	// The supervisor allows an after_stop phase up to 60 seconds after its
+	// services exit, so keep the CLI attached long enough to observe it.
+	for i := 0; i < 700 && alive(p.SupervisorPID); i++ {
 		time.Sleep(100 * time.Millisecond)
+	}
+	if alive(p.SupervisorPID) {
+		return fmt.Errorf("%s did not stop within 70 seconds", p.Name)
 	}
 	fmt.Fprintf(out, "✓ %s stopped\n", p.Name)
 	return nil
