@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tankibaj/server-them/internal/manifest"
+	"github.com/tankibaj/surfy/internal/manifest"
 )
 
 func TestViteDetection(t *testing.T) {

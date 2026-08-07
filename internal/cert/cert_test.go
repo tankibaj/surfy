@@ -14,8 +14,8 @@ import (
 
 func TestHostCertificateIsSignedByCA(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_STATE_DIR", d)
-	t.Setenv("SERVE_THEM_CERT_DIR", d+"/certificates")
+	t.Setenv("SURFY_STATE_DIR", d)
+	t.Setenv("SURFY_CERT_DIR", d+"/certificates")
 	caFile, _, e := EnsureCA()
 	if e != nil {
 		t.Fatal(e)
@@ -46,7 +46,7 @@ func TestHostCertificateIsSignedByCA(t *testing.T) {
 
 func TestMismatchedKeyPairIsRepaired(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_CERT_DIR", d)
+	t.Setenv("SURFY_CERT_DIR", d)
 	certFile, keyFile, e := EnsureHost("demo")
 	if e != nil {
 		t.Fatal(e)
@@ -74,7 +74,7 @@ func TestMismatchedKeyPairIsRepaired(t *testing.T) {
 }
 
 func TestRejectsUnsafeHostname(t *testing.T) {
-	t.Setenv("SERVE_THEM_CERT_DIR", t.TempDir())
+	t.Setenv("SURFY_CERT_DIR", t.TempDir())
 	if _, _, e := EnsureHost("../../tmp/owned"); e == nil || !strings.Contains(e.Error(), "invalid") {
 		t.Fatalf("expected validation error, got %v", e)
 	}

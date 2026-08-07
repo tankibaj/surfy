@@ -14,7 +14,7 @@ func TestLoadShorthandAndMapping(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	f := filepath.Join(d, "serve.yaml")
+	f := filepath.Join(d, "surfy.yaml")
 	data := "name: demo-app\nweb: ./frontend\napi:\n  path: ./backend\n  run: go run . --port ${PORT}\n  env:\n    APP_ENV: local\n"
 	if err := os.WriteFile(f, []byte(data), 0600); err != nil {
 		t.Fatal(err)
@@ -29,7 +29,7 @@ func TestLoadShorthandAndMapping(t *testing.T) {
 }
 func TestRejectsInvalidNameAndUnknownField(t *testing.T) {
 	d := t.TempDir()
-	f := filepath.Join(d, "serve.yaml")
+	f := filepath.Join(d, "surfy.yaml")
 	if err := os.WriteFile(f, []byte("name: Bad Name\nweb: .\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRejectsInvalidNameAndUnknownField(t *testing.T) {
 }
 func TestFindWalksParents(t *testing.T) {
 	d := t.TempDir()
-	f := filepath.Join(d, "serve.yaml")
+	f := filepath.Join(d, "surfy.yaml")
 	if err := os.WriteFile(f, []byte("web: .\n"), 0600); err != nil {
 		t.Fatal(err)
 	}

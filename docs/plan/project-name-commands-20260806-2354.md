@@ -27,6 +27,6 @@ Make every project command accept a registered public project name as well as a 
 
 ## Definition of Done
 
-- [x] `serve-them stop deliverydeck` targets the registered project.
+- [x] `surfy stop deliverydeck` targets the registered project.
 - [x] All project commands share the same selector behavior.
 - [x] Tests pass (26/26).

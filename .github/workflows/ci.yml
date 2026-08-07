@@ -29,9 +29,9 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: darwin
           GOARCH: arm64
-        run: go build -trimpath -ldflags='-s -w' -o serve-them-darwin-arm64 ./cmd/serve-them
+        run: go build -trimpath -ldflags='-s -w' -o surfy-darwin-arm64 ./cmd/surfy
       - uses: actions/upload-artifact@v4
         with:
-          name: serve-them-darwin-arm64
-          path: serve-them-darwin-arm64
+          name: surfy-darwin-arm64
+          path: surfy-darwin-arm64
           if-no-files-found: error

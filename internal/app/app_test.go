@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tankibaj/server-them/internal/state"
+	"github.com/tankibaj/surfy/internal/state"
 )
 
 func TestHelpDescribesCommands(t *testing.T) {
@@ -18,7 +18,7 @@ func TestHelpDescribesCommands(t *testing.T) {
 	if err := Run([]string{"--help"}, &out, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"serve-them [path]", "start [project-name|path]", "Start a project in the background.", "logs [project-name|path] [web|api] [--follow]", "Stream or print project logs.", "certificate status", "Show local certificate authority status.", "uninstall [--remove-ca]", "Remove Serve Them and optionally its trusted CA."} {
+	for _, expected := range []string{"surfy [path]", "start [project-name|path]", "Start a project in the background.", "logs [project-name|path] [web|api] [--follow]", "Stream or print project logs.", "certificate status", "Show local certificate authority status.", "uninstall [--remove-ca]", "Remove Surfy and optionally its trusted CA."} {
 		if !strings.Contains(out.String(), expected) {
 			t.Errorf("help does not contain %q:\n%s", expected, out.String())
 		}
@@ -26,7 +26,7 @@ func TestHelpDescribesCommands(t *testing.T) {
 }
 
 func TestEnsureUserStateDir(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "custom", "serve-them")
+	dir := filepath.Join(t.TempDir(), "custom", "surfy")
 	if e := ensureUserStateDir(dir); e != nil {
 		t.Fatal(e)
 	}
@@ -44,7 +44,7 @@ func TestEnsureUserStateDirRejectsSymlink(t *testing.T) {
 	if e := os.Mkdir(target, 0755); e != nil {
 		t.Fatal(e)
 	}
-	dir := filepath.Join(root, "serve-them")
+	dir := filepath.Join(root, "surfy")
 	if e := os.Symlink(target, dir); e != nil {
 		t.Fatal(e)
 	}
@@ -53,7 +53,7 @@ func TestEnsureUserStateDirRejectsSymlink(t *testing.T) {
 	}
 }
 func TestEnsureUserStateDirRejectsSymlinkedRegistry(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "serve-them")
+	dir := filepath.Join(t.TempDir(), "surfy")
 	if e := os.Mkdir(dir, 0700); e != nil {
 		t.Fatal(e)
 	}
@@ -138,7 +138,7 @@ func TestMigrateLegacyUserStateChangesOnlyKnownDirectEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(home, "Library", "Application Support", "serve-them")
+	dir := filepath.Join(home, "Library", "Application Support", "surfy")
 	if err = os.MkdirAll(filepath.Join(dir, "nested"), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestMigrateLegacyUserStateRejectsSymlinks(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			dir := filepath.Join(home, "Library", "Application Support", "serve-them")
+			dir := filepath.Join(home, "Library", "Application Support", "surfy")
 			target := filepath.Join(home, "target")
 			if err = os.MkdirAll(target, 0700); err != nil {
 				t.Fatal(err)
@@ -291,7 +291,7 @@ func TestPrepareUserStateMigratesOnlyPermissionFailureAtDefaultPath(t *testing.T
 		wantRun    bool
 	}{
 		{name: "default permission", dir: canonicalMacOSStateDir(home), prepareErr: permission, wantRun: true},
-		{name: "custom permission", dir: "/Volumes/state/serve-them", prepareErr: permission},
+		{name: "custom permission", dir: "/Volumes/state/surfy", prepareErr: permission},
 		{name: "default symlink", dir: canonicalMacOSStateDir(home), prepareErr: errors.New("state directory must not be a symlink")},
 	}
 	for _, tt := range tests {
@@ -334,7 +334,7 @@ func TestPrepareUserStateMigratesOnlyPermissionFailureAtDefaultPath(t *testing.T
 
 func TestLogsSelectsRegisteredProjectByName(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	t.Setenv("SURFY_STATE_DIR", filepath.Join(d, "state"))
 	webLog := filepath.Join(d, "web.log")
 	apiLog := filepath.Join(d, "api.log")
 	if e := os.WriteFile(webLog, []byte("web output\n"), 0600); e != nil {
@@ -355,7 +355,7 @@ func TestLogsSelectsRegisteredProjectByName(t *testing.T) {
 
 func TestLogsSelectsProjectAndService(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
+	t.Setenv("SURFY_STATE_DIR", filepath.Join(d, "state"))
 	webLog := filepath.Join(d, "web.log")
 	apiLog := filepath.Join(d, "api.log")
 	_ = os.WriteFile(webLog, []byte("web output\n"), 0600)
@@ -371,7 +371,7 @@ func TestLogsSelectsProjectAndService(t *testing.T) {
 }
 
 func TestLogsRejectsUnknownProjectName(t *testing.T) {
-	t.Setenv("SERVE_THEM_STATE_DIR", t.TempDir())
+	t.Setenv("SURFY_STATE_DIR", t.TempDir())
 	var out bytes.Buffer
 	e := logs([]string{"missing-project"}, &out)
 	if e == nil || !strings.Contains(e.Error(), `project "missing-project" is not registered`) {
@@ -382,7 +382,7 @@ func TestLogsRejectsUnknownProjectName(t *testing.T) {
 func registerLogProject(t *testing.T, name, webLog, apiLog string) {
 	t.Helper()
 	e := state.Update(func(r *state.Registry) error {
-		r.Projects[name] = &state.Project{ID: name, Name: name, Manifest: filepath.Join(t.TempDir(), "serve.yaml"), Status: "running", Web: &state.Service{Log: webLog}, API: &state.Service{Log: apiLog}}
+		r.Projects[name] = &state.Project{ID: name, Name: name, Manifest: filepath.Join(t.TempDir(), "surfy.yaml"), Status: "running", Web: &state.Service{Log: webLog}, API: &state.Service{Log: apiLog}}
 		return nil
 	})
 	if e != nil {
@@ -392,8 +392,8 @@ func registerLogProject(t *testing.T, name, webLog, apiLog string) {
 
 func TestResolveManifestByRegisteredName(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
-	mf := filepath.Join(d, "deliverydeck", "serve.yaml")
+	t.Setenv("SURFY_STATE_DIR", filepath.Join(d, "state"))
+	mf := filepath.Join(d, "deliverydeck", "surfy.yaml")
 	if e := os.MkdirAll(filepath.Dir(mf), 0755); e != nil {
 		t.Fatal(e)
 	}
@@ -421,13 +421,13 @@ func TestResolveManifestByRegisteredName(t *testing.T) {
 
 func TestResolveManifestPrefersExistingPath(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
-	mf := filepath.Join(d, "serve.yaml")
+	t.Setenv("SURFY_STATE_DIR", filepath.Join(d, "state"))
+	mf := filepath.Join(d, "surfy.yaml")
 	if e := os.WriteFile(mf, []byte("web: .\n"), 0600); e != nil {
 		t.Fatal(e)
 	}
 	if e := state.Update(func(r *state.Registry) error {
-		r.Projects["id"] = &state.Project{ID: "id", Name: d, Manifest: "/wrong/serve.yaml"}
+		r.Projects["id"] = &state.Project{ID: "id", Name: d, Manifest: "/wrong/surfy.yaml"}
 		return nil
 	}); e != nil {
 		t.Fatal(e)
@@ -447,8 +447,8 @@ func TestResolveManifestPrefersExistingPath(t *testing.T) {
 
 func TestStatusAndStopAcceptRegisteredName(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("SERVE_THEM_STATE_DIR", filepath.Join(d, "state"))
-	mf := filepath.Join(d, "serve.yaml")
+	t.Setenv("SURFY_STATE_DIR", filepath.Join(d, "state"))
+	mf := filepath.Join(d, "surfy.yaml")
 	if e := os.WriteFile(mf, []byte("web: .\n"), 0600); e != nil {
 		t.Fatal(e)
 	}

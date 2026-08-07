@@ -34,7 +34,7 @@ func Find(start string) (string, error) {
 		abs = filepath.Dir(abs)
 	}
 	for {
-		candidate := filepath.Join(abs, "serve.yaml")
+		candidate := filepath.Join(abs, "surfy.yaml")
 		if _, err := os.Stat(candidate); err == nil {
 			return filepath.EvalSymlinks(candidate)
 		}
@@ -44,7 +44,7 @@ func Find(start string) (string, error) {
 		}
 		abs = parent
 	}
-	return "", errors.New("no serve.yaml was found\n\nCreate one:\n\nweb: ./frontend\napi: ./backend")
+	return "", errors.New("no surfy.yaml was found\n\nCreate one:\n\nweb: ./frontend\napi: ./backend")
 }
 
 // Load parses the deliberately small MVP schema without accepting arbitrary YAML tags, aliases, or object types.
@@ -131,7 +131,7 @@ func Load(file string) (*Manifest, error) {
 		return nil, err
 	}
 	if m.Web == nil && m.API == nil {
-		return nil, errors.New("serve.yaml must define web, api, or both")
+		return nil, errors.New("surfy.yaml must define web, api, or both")
 	}
 	root := filepath.Dir(file)
 	for label, svc := range map[string]*Service{"web": m.Web, "api": m.API} {

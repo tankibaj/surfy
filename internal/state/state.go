@@ -37,7 +37,7 @@ type Registry struct {
 }
 
 func Dir() (string, error) {
-	if v := os.Getenv("SERVE_THEM_STATE_DIR"); v != "" {
+	if v := os.Getenv("SURFY_STATE_DIR"); v != "" {
 		return filepath.Abs(v)
 	}
 	home, err := os.UserHomeDir()
@@ -45,16 +45,16 @@ func Dir() (string, error) {
 		return "", err
 	}
 	if runtime.GOOS == "darwin" {
-		return filepath.Join(home, "Library", "Application Support", "serve-them"), nil
+		return filepath.Join(home, "Library", "Application Support", "surfy"), nil
 	}
 	if v := os.Getenv("XDG_STATE_HOME"); v != "" {
-		return filepath.Join(v, "serve-them"), nil
+		return filepath.Join(v, "surfy"), nil
 	}
-	return filepath.Join(home, ".local", "state", "serve-them"), nil
+	return filepath.Join(home, ".local", "state", "surfy"), nil
 }
 
 func LogDir() (string, error) {
-	if v := os.Getenv("SERVE_THEM_LOG_DIR"); v != "" {
+	if v := os.Getenv("SURFY_LOG_DIR"); v != "" {
 		return filepath.Abs(v)
 	}
 	home, e := os.UserHomeDir()
@@ -62,7 +62,7 @@ func LogDir() (string, error) {
 		return "", e
 	}
 	if runtime.GOOS == "darwin" {
-		return filepath.Join(home, "Library", "Logs", "serve-them"), nil
+		return filepath.Join(home, "Library", "Logs", "surfy"), nil
 	}
 	d, e := Dir()
 	if e != nil {

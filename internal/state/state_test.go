@@ -7,7 +7,7 @@ import (
 )
 
 func TestRegistryProjectLimit(t *testing.T) {
-	t.Setenv("SERVE_THEM_STATE_DIR", t.TempDir())
+	t.Setenv("SURFY_STATE_DIR", t.TempDir())
 	e := Update(func(r *Registry) error {
 		for i := 0; i < 257; i++ {
 			id := fmt.Sprint(i)

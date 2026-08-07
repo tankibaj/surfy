@@ -17,14 +17,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tankibaj/server-them/internal/buildinfo"
-	"github.com/tankibaj/server-them/internal/cert"
-	"github.com/tankibaj/server-them/internal/edge"
-	"github.com/tankibaj/server-them/internal/logview"
-	"github.com/tankibaj/server-them/internal/manifest"
-	"github.com/tankibaj/server-them/internal/scaffold"
-	"github.com/tankibaj/server-them/internal/state"
-	"github.com/tankibaj/server-them/internal/supervisor"
+	"github.com/tankibaj/surfy/internal/buildinfo"
+	"github.com/tankibaj/surfy/internal/cert"
+	"github.com/tankibaj/surfy/internal/edge"
+	"github.com/tankibaj/surfy/internal/logview"
+	"github.com/tankibaj/surfy/internal/manifest"
+	"github.com/tankibaj/surfy/internal/scaffold"
+	"github.com/tankibaj/surfy/internal/state"
+	"github.com/tankibaj/surfy/internal/supervisor"
 )
 
 const version = buildinfo.Version
@@ -38,7 +38,7 @@ func Run(args []string, out, errOut io.Writer) error {
 	switch cmd {
 	case "init":
 		if len(rest) > 0 {
-			return errors.New("serve-them init uses the current directory and accepts no path")
+			return errors.New("surfy init uses the current directory and accepts no path")
 		}
 		file, e := scaffold.Create(".")
 		if e != nil {
@@ -104,18 +104,18 @@ func Run(args []string, out, errOut io.Writer) error {
 		if os.Geteuid() != 0 {
 			return errors.New("edge initialization must run as root")
 		}
-		_ = os.Setenv("SERVE_THEM_CERT_DIR", "/Library/Application Support/serve-them/certificates")
+		_ = os.Setenv("SURFY_CERT_DIR", "/Library/Application Support/surfy/certificates")
 		_, _, e := cert.EnsureCA()
 		return e
 	case "_repair-edge":
 		if os.Geteuid() != 0 {
 			return errors.New("edge repair must run as root")
 		}
-		certDir := "/Library/Application Support/serve-them/certificates"
+		certDir := "/Library/Application Support/surfy/certificates"
 		if e := os.RemoveAll(certDir); e != nil {
 			return e
 		}
-		_ = os.Setenv("SERVE_THEM_CERT_DIR", certDir)
+		_ = os.Setenv("SURFY_CERT_DIR", certDir)
 		_, _, e := cert.EnsureCA()
 		return e
 	case "_migrate-user-state":
@@ -178,7 +178,7 @@ func Run(args []string, out, errOut io.Writer) error {
 		usage(out)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (run serve-them help)", cmd)
+		return fmt.Errorf("unknown command %q (run surfy help)", cmd)
 	}
 }
 
@@ -395,7 +395,7 @@ func supervisorAlive(p *state.Project) bool {
 		return strings.Contains(cmd, "_supervise "+p.Manifest)
 	}
 	fields := strings.Fields(cmd)
-	return len(fields) > 0 && strings.Contains(filepath.Base(fields[0]), "serve-them")
+	return len(fields) > 0 && strings.Contains(filepath.Base(fields[0]), "surfy")
 }
 func enable(path string, on bool, out io.Writer) error {
 	mf, e := resolveManifest(path)
@@ -432,8 +432,8 @@ func updateLaunchAgent(m *manifest.Manifest, mf, id string, on bool) error {
 		return e
 	}
 	dir := filepath.Join(home, "Library", "LaunchAgents")
-	file := filepath.Join(dir, "dev.serve-them.project."+id+".plist")
-	label := "dev.serve-them.project." + id
+	file := filepath.Join(dir, "dev.surfy.project."+id+".plist")
+	label := "dev.surfy.project." + id
 	domain := "gui/" + strconv.Itoa(os.Getuid())
 	_ = exec.Command("launchctl", "bootout", domain+"/"+label).Run()
 	if !on {
@@ -493,17 +493,17 @@ func installMode(out io.Writer, repair bool) error {
 	}); e != nil {
 		return fmt.Errorf("prepare user state: %w", e)
 	}
-	tmp, e := os.CreateTemp("", "serve-them-edge-*.plist")
+	tmp, e := os.CreateTemp("", "surfy-edge-*.plist")
 	if e != nil {
 		return e
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
-	helper := "/Library/PrivilegedHelperTools/serve-them-edge"
-	certDir := "/Library/Application Support/serve-them/certificates"
+	helper := "/Library/PrivilegedHelperTools/surfy-edge"
+	certDir := "/Library/Application Support/surfy/certificates"
 	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict><key>Label</key><string>dev.serve-them.edge</string><key>ProgramArguments</key><array><string>%s</string><string>edge</string></array><key>EnvironmentVariables</key><dict><key>SERVE_THEM_STATE_DIR</key><string>%s</string><key>SERVE_THEM_CERT_DIR</key><string>%s</string><key>SERVE_THEM_USER_UID</key><string>%d</string></dict><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>StandardOutPath</key><string>/var/log/serve-them-edge.log</string><key>StandardErrorPath</key><string>/var/log/serve-them-edge.log</string></dict></plist>`, xmlEscape(helper), xmlEscape(d), xmlEscape(certDir), os.Getuid())
+<plist version="1.0"><dict><key>Label</key><string>dev.surfy.edge</string><key>ProgramArguments</key><array><string>%s</string><string>edge</string></array><key>EnvironmentVariables</key><dict><key>SURFY_STATE_DIR</key><string>%s</string><key>SURFY_CERT_DIR</key><string>%s</string><key>SURFY_USER_UID</key><string>%d</string></dict><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>StandardOutPath</key><string>/var/log/surfy-edge.log</string><key>StandardErrorPath</key><string>/var/log/surfy-edge.log</string></dict></plist>`, xmlEscape(helper), xmlEscape(d), xmlEscape(certDir), os.Getuid())
 	if _, e = tmp.WriteString(plist); e != nil {
 		tmp.Close()
 		return e
@@ -511,8 +511,8 @@ func installMode(out io.Writer, repair bool) error {
 	if e = tmp.Close(); e != nil {
 		return e
 	}
-	if exec.Command("launchctl", "print", "system/dev.serve-them.edge").Run() == nil {
-		c := exec.Command("sudo", "launchctl", "bootout", "system/dev.serve-them.edge")
+	if exec.Command("launchctl", "print", "system/dev.surfy.edge").Run() == nil {
+		c := exec.Command("sudo", "launchctl", "bootout", "system/dev.surfy.edge")
 		c.Stdin = os.Stdin
 		c.Stdout = out
 		c.Stderr = os.Stderr
@@ -528,7 +528,7 @@ func installMode(out io.Writer, repair bool) error {
 	if repair {
 		initCommand = "_repair-edge"
 	}
-	commands := [][]string{{"mkdir", "-p", "/Library/PrivilegedHelperTools"}, {"cp", exe, helper}, {"chown", "root:wheel", helper}, {"chmod", "755", helper}, {helper, initCommand}, {"security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", "/Library/Keychains/System.keychain", caFile}, {"cp", tmpName, "/Library/LaunchDaemons/dev.serve-them.edge.plist"}, {"chown", "root:wheel", "/Library/LaunchDaemons/dev.serve-them.edge.plist"}, {"chmod", "644", "/Library/LaunchDaemons/dev.serve-them.edge.plist"}, {"launchctl", "bootstrap", "system", "/Library/LaunchDaemons/dev.serve-them.edge.plist"}}
+	commands := [][]string{{"mkdir", "-p", "/Library/PrivilegedHelperTools"}, {"cp", exe, helper}, {"chown", "root:wheel", helper}, {"chmod", "755", helper}, {helper, initCommand}, {"security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", "/Library/Keychains/System.keychain", caFile}, {"cp", tmpName, "/Library/LaunchDaemons/dev.surfy.edge.plist"}, {"chown", "root:wheel", "/Library/LaunchDaemons/dev.surfy.edge.plist"}, {"chmod", "644", "/Library/LaunchDaemons/dev.surfy.edge.plist"}, {"launchctl", "bootstrap", "system", "/Library/LaunchDaemons/dev.surfy.edge.plist"}}
 	for _, a := range commands {
 		c := exec.Command("sudo", a...)
 		c.Stdin = os.Stdin
@@ -538,7 +538,7 @@ func installMode(out io.Writer, repair bool) error {
 			return fmt.Errorf("sudo %s: %w", a[0], e)
 		}
 	}
-	fmt.Fprintln(out, "✓ Serve Them local CA trusted\n✓ HTTPS edge service installed and started")
+	fmt.Fprintln(out, "✓ Surfy local CA trusted\n✓ HTTPS edge service installed and started")
 	return nil
 }
 
@@ -569,8 +569,8 @@ func uninstall(args []string, out io.Writer) error {
 		}
 	}
 	if runtime.GOOS == "darwin" {
-		if exec.Command("launchctl", "print", "system/dev.serve-them.edge").Run() == nil {
-			c := exec.Command("sudo", "launchctl", "bootout", "system/dev.serve-them.edge")
+		if exec.Command("launchctl", "print", "system/dev.surfy.edge").Run() == nil {
+			c := exec.Command("sudo", "launchctl", "bootout", "system/dev.surfy.edge")
 			c.Stdin = os.Stdin
 			c.Stdout = out
 			c.Stderr = os.Stderr
@@ -578,7 +578,7 @@ func uninstall(args []string, out io.Writer) error {
 				return e
 			}
 		}
-		for _, target := range []string{"/Library/LaunchDaemons/dev.serve-them.edge.plist", "/Library/PrivilegedHelperTools/serve-them-edge"} {
+		for _, target := range []string{"/Library/LaunchDaemons/dev.surfy.edge.plist", "/Library/PrivilegedHelperTools/surfy-edge"} {
 			c := exec.Command("sudo", "rm", "-f", target)
 			c.Stdin = os.Stdin
 			c.Stdout = out
@@ -593,7 +593,7 @@ func uninstall(args []string, out io.Writer) error {
 			if e := removeTrustedCAs(); e != nil {
 				return e
 			}
-			c := exec.Command("sudo", "rm", "-rf", "/Library/Application Support/serve-them")
+			c := exec.Command("sudo", "rm", "-rf", "/Library/Application Support/surfy")
 			c.Stdin = os.Stdin
 			c.Stdout = out
 			c.Stderr = os.Stderr
@@ -603,7 +603,7 @@ func uninstall(args []string, out io.Writer) error {
 		}
 	}
 	if home, e := os.UserHomeDir(); e == nil {
-		agents, _ := filepath.Glob(filepath.Join(home, "Library", "LaunchAgents", "dev.serve-them.project.*.plist"))
+		agents, _ := filepath.Glob(filepath.Join(home, "Library", "LaunchAgents", "dev.surfy.project.*.plist"))
 		for _, f := range agents {
 			label := strings.TrimSuffix(filepath.Base(f), ".plist")
 			_ = exec.Command("launchctl", "bootout", "gui/"+strconv.Itoa(os.Getuid())+"/"+label).Run()
@@ -612,7 +612,7 @@ func uninstall(args []string, out io.Writer) error {
 			}
 		}
 	}
-	if d, e := state.Dir(); e == nil && filepath.Base(d) == "serve-them" {
+	if d, e := state.Dir(); e == nil && filepath.Base(d) == "surfy" {
 		_ = os.RemoveAll(d)
 	}
 	fmt.Fprintln(out, "✓ edge service removed")
@@ -627,16 +627,16 @@ func removeTrustedCAs() error {
 		return nil
 	}
 	for i := 0; i < 64; i++ {
-		if exec.Command("security", "find-certificate", "-c", "Serve Them Local CA", "/Library/Keychains/System.keychain").Run() != nil {
+		if exec.Command("security", "find-certificate", "-c", "Surfy Local CA", "/Library/Keychains/System.keychain").Run() != nil {
 			return nil
 		}
-		c := exec.Command("sudo", "security", "delete-certificate", "-c", "Serve Them Local CA", "/Library/Keychains/System.keychain")
+		c := exec.Command("sudo", "security", "delete-certificate", "-c", "Surfy Local CA", "/Library/Keychains/System.keychain")
 		c.Stdin = os.Stdin
 		if c.Run() != nil {
-			return errors.New("failed to remove Serve Them certificate from the System Keychain")
+			return errors.New("failed to remove Surfy certificate from the System Keychain")
 		}
 	}
-	return errors.New("too many Serve Them certificates remain in the System Keychain")
+	return errors.New("too many Surfy certificates remain in the System Keychain")
 }
 
 func ensureUserStateDir(dir string) error {
@@ -725,7 +725,7 @@ func validatedInvokingUser(getenv func(string) string, lookup func(string) (*use
 }
 
 func canonicalMacOSStateDir(home string) string {
-	return filepath.Join(filepath.Clean(home), "Library", "Application Support", "serve-them")
+	return filepath.Join(filepath.Clean(home), "Library", "Application Support", "surfy")
 }
 
 func prepareUserStateDirWith(dir, home string, prepare func(string) error, migrate func() error) error {
@@ -866,7 +866,7 @@ func xmlEscape(s string) string {
 	return r.Replace(s)
 }
 func stableExecutable() (string, error) {
-	if p, e := exec.LookPath("serve-them"); e == nil {
+	if p, e := exec.LookPath("surfy"); e == nil {
 		if abs, e := filepath.Abs(p); e == nil {
 			return abs, nil
 		}
@@ -878,7 +878,7 @@ func caTrusted(file string) bool {
 	if e != nil {
 		return false
 	}
-	out, e := exec.Command("security", "find-certificate", "-a", "-c", "Serve Them Local CA", "-p", "/Library/Keychains/System.keychain").Output()
+	out, e := exec.Command("security", "find-certificate", "-a", "-c", "Surfy Local CA", "-p", "/Library/Keychains/System.keychain").Output()
 	return e == nil && bytes.Contains(out, bytes.TrimSpace(b))
 }
 func doctor(out io.Writer) error {
@@ -886,19 +886,19 @@ func doctor(out io.Writer) error {
 	if e != nil {
 		return e
 	}
-	fmt.Fprintln(out, "Serve Them doctor")
+	fmt.Fprintln(out, "Surfy doctor")
 	fmt.Fprintf(out, "✓ state directory: %s\n", d)
 	ca, e := cert.CAFile()
 	if e != nil {
 		return e
 	}
 	if _, e = os.Stat(ca); e != nil {
-		return fmt.Errorf("local CA is not installed: run serve-them install")
+		return fmt.Errorf("local CA is not installed: run surfy install")
 	}
 	fmt.Fprintf(out, "✓ local CA: %s\n", ca)
 	if runtime.GOOS == "darwin" {
 		if !caTrusted(ca) {
-			return errors.New("Serve Them local CA is not trusted in the System Keychain")
+			return errors.New("Surfy local CA is not trusted in the System Keychain")
 		}
 		fmt.Fprintln(out, "✓ local CA trusted in macOS System Keychain")
 	}
@@ -912,7 +912,7 @@ func doctor(out io.Writer) error {
 		return e
 	}
 	if edgeVersion != version {
-		return fmt.Errorf("HTTPS edge version %s does not match CLI %s; run serve-them install", edgeVersion, version)
+		return fmt.Errorf("HTTPS edge version %s does not match CLI %s; run surfy install", edgeVersion, version)
 	}
 	fmt.Fprintf(out, "✓ HTTPS edge version: %s\n", edgeVersion)
 	return nil
@@ -940,14 +940,14 @@ func certificate(args []string, out io.Writer) error {
 	return errors.New("certificate command must be status or repair")
 }
 func usage(w io.Writer) {
-	fmt.Fprintln(w, `Serve Them — local multi-application HTTPS runtime
+	fmt.Fprintln(w, `Surfy — local multi-application HTTPS runtime
 
 Usage:
-  serve-them [path]                       Start a project in the foreground.
-  serve-them <command> [options] [path]
+  surfy [path]                       Start a project in the foreground.
+  surfy <command> [options] [path]
 
 Project commands:
-  init                                    Create serve.yaml in the current directory.
+  init                                    Create surfy.yaml in the current directory.
   start [project-name|path]               Start a project in the background.
   stop [project-name|path]                Stop a background project.
   restart [project-name|path]             Restart a background project.
@@ -964,7 +964,7 @@ Global commands:
   certificate status                     Show local certificate authority status.
   certificate repair                     Repair certificate authority trust.
   install                                Install the HTTPS edge and trusted CA.
-  uninstall [--remove-ca]                Remove Serve Them and optionally its trusted CA.
+  uninstall [--remove-ca]                Remove Surfy and optionally its trusted CA.
   edge                                   Run the HTTPS edge service.
   version                                Print the installed version.
   help                                   Show this help.`)

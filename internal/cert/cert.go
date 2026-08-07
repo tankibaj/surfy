@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tankibaj/server-them/internal/state"
+	"github.com/tankibaj/surfy/internal/state"
 )
 
 func EnsureCA() (certFile, keyFile string, err error) {
@@ -48,7 +48,7 @@ func EnsureCA() (certFile, keyFile string, err error) {
 		return certFile, keyFile, nil
 	}
 	if certExists || keyExists {
-		return "", "", errors.New("local CA keypair is invalid; run serve-them uninstall --remove-ca, then serve-them install")
+		return "", "", errors.New("local CA keypair is invalid; run surfy uninstall --remove-ca, then surfy install")
 	}
 	key, e := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if e != nil {
@@ -56,7 +56,7 @@ func EnsureCA() (certFile, keyFile string, err error) {
 	}
 	now := time.Now()
 	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	t := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "Serve Them Local CA", Organization: []string{"Serve Them"}}, NotBefore: now.Add(-time.Hour), NotAfter: now.AddDate(10, 0, 0), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature}
+	t := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "Surfy Local CA", Organization: []string{"Surfy"}}, NotBefore: now.Add(-time.Hour), NotAfter: now.AddDate(10, 0, 0), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature}
 	der, e := x509.CreateCertificate(rand.Reader, t, t, &key.PublicKey, key)
 	if e != nil {
 		return "", "", e
@@ -135,7 +135,7 @@ func RequestHost(name string) error {
 	if !validName.MatchString(name) {
 		return fmt.Errorf("invalid certificate hostname %q", name)
 	}
-	if os.Getenv("SERVE_THEM_UNPRIVILEGED_CERTS") == "1" {
+	if os.Getenv("SURFY_UNPRIVILEGED_CERTS") == "1" {
 		_, _, e := EnsureHost(name)
 		return e
 	}
@@ -265,11 +265,11 @@ func writePEM(f string, mode os.FileMode, typ string, b []byte) error {
 var validName = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 
 func directory() (string, error) {
-	if d := os.Getenv("SERVE_THEM_CERT_DIR"); d != "" {
+	if d := os.Getenv("SURFY_CERT_DIR"); d != "" {
 		return filepath.Abs(d)
 	}
 	if runtime.GOOS == "darwin" {
-		return "/Library/Application Support/serve-them/certificates", nil
+		return "/Library/Application Support/surfy/certificates", nil
 	}
 	d, e := state.Dir()
 	if e != nil {

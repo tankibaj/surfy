@@ -4,7 +4,7 @@
 
 ## Goal
 
-Ensure `serve-them install` securely migrates legacy root-owned default macOS state to the invoking user without manual recovery commands.
+Ensure `surfy install` securely migrates legacy root-owned default macOS state to the invoking user without manual recovery commands.
 
 ## Scope
 

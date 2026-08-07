@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tankibaj/server-them/internal/state"
+	"github.com/tankibaj/surfy/internal/state"
 )
 
 func TestProxyRejectsNonLocalhost(t *testing.T) {
-	t.Setenv("SERVE_THEM_STATE_DIR", t.TempDir())
+	t.Setenv("SURFY_STATE_DIR", t.TempDir())
 	r := httptest.NewRequest(http.MethodGet, "https://example.test/", nil)
 	w := httptest.NewRecorder()
 	proxy(w, r)
@@ -21,7 +21,7 @@ func TestProxyRejectsNonLocalhost(t *testing.T) {
 }
 
 func TestProxyForwardsWebToLoopback(t *testing.T) {
-	t.Setenv("SERVE_THEM_STATE_DIR", t.TempDir())
+	t.Setenv("SURFY_STATE_DIR", t.TempDir())
 	useRecordingTransport(t)
 	if e := state.Update(func(r *state.Registry) error {
 		r.Projects["id"] = &state.Project{ID: "id", Name: "demo", Status: "running", Web: &state.Service{Port: 43121, Status: "running"}}
@@ -38,7 +38,7 @@ func TestProxyForwardsWebToLoopback(t *testing.T) {
 }
 
 func TestProxyPreservesAPIPath(t *testing.T) {
-	t.Setenv("SERVE_THEM_STATE_DIR", t.TempDir())
+	t.Setenv("SURFY_STATE_DIR", t.TempDir())
 	useRecordingTransport(t)
 	if e := state.Update(func(r *state.Registry) error {
 		r.Projects["id"] = &state.Project{ID: "id", Name: "demo", Status: "running", API: &state.Service{Port: 43122, Status: "running"}}

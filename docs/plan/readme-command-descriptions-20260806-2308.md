@@ -10,7 +10,7 @@ Make the README command overview self-explanatory by adding a concise descriptio
 
 - Update only the README command reference.
 - Preserve the existing command syntax and ordering.
-- Keep descriptions consistent with `serve-them --help`.
+- Keep descriptions consistent with `surfy --help`.
 
 ## Affected Files
 

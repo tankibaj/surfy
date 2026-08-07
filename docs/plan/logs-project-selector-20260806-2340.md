@@ -4,7 +4,7 @@
 
 ## Goal
 
-Allow `serve-them logs <project-name>` to read logs for a registered project from any directory.
+Allow `surfy logs <project-name>` to read logs for a registered project from any directory.
 Make combined service logs human-readable and quickly scannable with stable service colors and level indicators.
 
 ## Scope
@@ -33,8 +33,8 @@ Make combined service logs human-readable and quickly scannable with stable serv
 
 ## Definition of Done
 
-- [x] `serve-them logs deliverydeck` reads all available logs.
-- [x] `serve-them logs deliverydeck api --follow` targets API logs.
+- [x] `surfy logs deliverydeck` reads all available logs.
+- [x] `surfy logs deliverydeck api --follow` targets API logs.
 - [x] Existing current-directory syntax remains compatible.
 - [x] Foreground and retained logs share the same visual language.
 - [x] Tests pass (23/23).

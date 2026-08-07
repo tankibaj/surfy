@@ -4,7 +4,7 @@
 
 ## Goal
 
-Document the complete Serve Them and Homebrew removal sequence.
+Document the complete Surfy and Homebrew removal sequence.
 
 ## Scope
 

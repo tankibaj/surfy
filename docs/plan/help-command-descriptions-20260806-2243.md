@@ -4,7 +4,7 @@
 
 ## Goal
 
-Make `serve-them --help` a concise command reference with usage syntax and a description for every public command.
+Make `surfy --help` a concise command reference with usage syntax and a description for every public command.
 
 ## Scope
 

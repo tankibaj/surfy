@@ -17,11 +17,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tankibaj/server-them/internal/cert"
-	"github.com/tankibaj/server-them/internal/detect"
-	"github.com/tankibaj/server-them/internal/logview"
-	"github.com/tankibaj/server-them/internal/manifest"
-	"github.com/tankibaj/server-them/internal/state"
+	"github.com/tankibaj/surfy/internal/cert"
+	"github.com/tankibaj/surfy/internal/detect"
+	"github.com/tankibaj/surfy/internal/logview"
+	"github.com/tankibaj/surfy/internal/manifest"
+	"github.com/tankibaj/surfy/internal/state"
 )
 
 type running struct {
@@ -93,7 +93,7 @@ func Run(manifestFile string, background bool, out io.Writer) error {
 		}
 		for oid, p := range r.Projects {
 			if oid != id && p.Name == m.Name {
-				return fmt.Errorf("the hostname %s.localhost is already registered by:\n\n%s\n\nSet a unique name in serve.yaml", m.Name, filepath.Dir(p.Manifest))
+				return fmt.Errorf("the hostname %s.localhost is already registered by:\n\n%s\n\nSet a unique name in surfy.yaml", m.Name, filepath.Dir(p.Manifest))
 			}
 		}
 		enabled := false
@@ -482,7 +482,7 @@ func supervisorProcess(p *state.Project) bool {
 		return strings.Contains(cmd, "_supervise "+p.Manifest)
 	}
 	f := strings.Fields(cmd)
-	return len(f) > 0 && strings.Contains(filepath.Base(f[0]), "serve-them")
+	return len(f) > 0 && strings.Contains(filepath.Base(f[0]), "surfy")
 }
 func rotate(file string, max int64, keep int) {
 	st, e := os.Stat(file)

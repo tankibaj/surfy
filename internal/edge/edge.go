@@ -18,14 +18,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tankibaj/server-them/internal/buildinfo"
-	"github.com/tankibaj/server-them/internal/cert"
-	"github.com/tankibaj/server-them/internal/state"
+	"github.com/tankibaj/surfy/internal/buildinfo"
+	"github.com/tankibaj/surfy/internal/cert"
+	"github.com/tankibaj/surfy/internal/state"
 )
 
 func Run(ctx context.Context) error {
-	httpAddr := env("SERVE_THEM_HTTP_ADDR", "127.0.0.1:80")
-	httpsAddr := env("SERVE_THEM_HTTPS_ADDR", "127.0.0.1:443")
+	httpAddr := env("SURFY_HTTP_ADDR", "127.0.0.1:80")
+	httpsAddr := env("SURFY_HTTPS_ADDR", "127.0.0.1:443")
 	if err := startControl(ctx); err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func Run(ctx context.Context) error {
 			host = h
 		}
 		if !strings.HasSuffix(strings.ToLower(host), ".localhost") {
-			http.Error(w, "Serve Them only accepts .localhost hosts.", http.StatusMisdirectedRequest)
+			http.Error(w, "Surfy only accepts .localhost hosts.", http.StatusMisdirectedRequest)
 			return
 		}
 		http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusTemporaryRedirect)
@@ -85,13 +85,13 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	host = strings.ToLower(host)
 	if !strings.HasSuffix(host, ".localhost") {
-		http.Error(w, "Serve Them only accepts .localhost hosts.", http.StatusMisdirectedRequest)
+		http.Error(w, "Surfy only accepts .localhost hosts.", http.StatusMisdirectedRequest)
 		return
 	}
 	name := strings.TrimSuffix(host, ".localhost")
 	reg, e := cachedRegistry()
 	if e != nil {
-		http.Error(w, "Serve Them could not read its route registry.", 500)
+		http.Error(w, "Surfy could not read its route registry.", 500)
 		return
 	}
 	var p *state.Project
@@ -220,7 +220,7 @@ func startControl(ctx context.Context) error {
 		ln.Close()
 		return e
 	}
-	if uid := os.Getenv("SERVE_THEM_USER_UID"); uid != "" {
+	if uid := os.Getenv("SURFY_USER_UID"); uid != "" {
 		n, parseErr := strconv.Atoi(uid)
 		if parseErr != nil {
 			ln.Close()
@@ -307,7 +307,7 @@ func registeredNameFresh(name string) bool {
 func unavailable(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusBadGateway)
-	_, _ = io.WriteString(w, "<!doctype html><title>Serve Them</title><h1>Application unavailable</h1><p>"+msg+"</p>")
+	_, _ = io.WriteString(w, "<!doctype html><title>Surfy</title><h1>Application unavailable</h1><p>"+msg+"</p>")
 }
 func env(k, d string) string {
 	if v := os.Getenv(k); v != "" {

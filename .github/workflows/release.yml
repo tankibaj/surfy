@@ -41,13 +41,13 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           mkdir -p dist/stage
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o dist/stage/serve-them ./cmd/serve-them
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C dist/stage -cf - serve-them | gzip -n > "dist/serve-them_${version}_darwin_arm64.tar.gz"
-          sha256sum "dist/serve-them_${version}_darwin_arm64.tar.gz" > "dist/serve-them_${version}_darwin_arm64.tar.gz.sha256"
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o dist/stage/surfy ./cmd/surfy
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C dist/stage -cf - surfy | gzip -n > "dist/surfy_${version}_darwin_arm64.tar.gz"
+          sha256sum "dist/surfy_${version}_darwin_arm64.tar.gz" > "dist/surfy_${version}_darwin_arm64.tar.gz.sha256"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-assets
-          path: dist/serve-them_*
+          path: dist/surfy_*
           if-no-files-found: error
 
   publish:
@@ -68,9 +68,13 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
-          current="$(sed -nE 's/^  version "([^"]+)"/\1/p' Formula/serve-them.rb)"
-          if [[ "$version" == "$current" ]] || [[ "$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -n 1)" != "$version" ]]; then
-            echo "release version ${version} must be newer than formula version ${current}" >&2
+          current="$(sed -nE 's/^  version "([^"]+)"/\1/p' Formula/surfy.rb)"
+          if [[ "$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -n 1)" != "$version" ]]; then
+            echo "release version ${version} must not be older than formula version ${current}" >&2
+            exit 1
+          fi
+          if [[ "$version" == "$current" ]] && ! grep -Fq 'sha256 :no_check' Formula/surfy.rb; then
+            echo "release version ${version} is already published in the formula" >&2
             exit 1
           fi
       - name: Publish GitHub release
@@ -80,26 +84,26 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           assets=(
-            "dist/serve-them_${version}_darwin_arm64.tar.gz"
-            "dist/serve-them_${version}_darwin_arm64.tar.gz.sha256"
+            "dist/surfy_${version}_darwin_arm64.tar.gz"
+            "dist/surfy_${version}_darwin_arm64.tar.gz.sha256"
           )
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
-              --title "Serve Them $GITHUB_REF_NAME" --generate-notes
+              --title "Surfy $GITHUB_REF_NAME" --generate-notes
           fi
       - name: Update Homebrew formula on main
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
-          asset="dist/serve-them_${version}_darwin_arm64.tar.gz"
+          asset="dist/surfy_${version}_darwin_arm64.tar.gz"
           sha="$(sha256sum "$asset" | cut -d ' ' -f 1)"
-          sed -i -E "s/version \"[^\"]+\"/version \"${version}\"/" Formula/serve-them.rb
-          sed -i -E "s#url \"[^\"]+\"#url \"https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/serve-them_${version}_darwin_arm64.tar.gz\"#" Formula/serve-them.rb
-          sed -i -E "s/sha256 \"[^\"]+\"/sha256 \"${sha}\"/" Formula/serve-them.rb
+          sed -i -E "s/version \"[^\"]+\"/version \"${version}\"/" Formula/surfy.rb
+          sed -i -E "s#url \"[^\"]+\"#url \"https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/surfy_${version}_darwin_arm64.tar.gz\"#" Formula/surfy.rb
+          sed -i -E "s/sha256 .*/sha256 \"${sha}\"/" Formula/surfy.rb
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add Formula/serve-them.rb
+          git add Formula/surfy.rb
           git diff --cached --quiet || git commit -m "chore(homebrew): update formula for ${GITHUB_REF_NAME} [skip ci]"
           git push origin main

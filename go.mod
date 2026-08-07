@@ -1,3 +1,3 @@
-module github.com/tankibaj/server-them
+module github.com/tankibaj/surfy
 
 go 1.26

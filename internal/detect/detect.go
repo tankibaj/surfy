@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tankibaj/server-them/internal/manifest"
+	"github.com/tankibaj/surfy/internal/manifest"
 )
 
 type Result struct{ Command, Runtime, Confidence string }
