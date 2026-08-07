@@ -90,7 +90,7 @@ func Run(args []string, out, errOut io.Writer) error {
 			}
 			r, _ = state.Read()
 			if p := state.FindByManifest(r, mf); p != nil && p.Status == "running" {
-				fmt.Fprintf(out, "✓ %s started\n  https://%s.localhost\n", m.Name, m.Name)
+				fmt.Fprint(out, formatStarted(m.Name, logview.Enabled(out)))
 				return nil
 			}
 		}
@@ -180,6 +180,20 @@ func Run(args []string, out, errOut io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q (run surfy help)", cmd)
 	}
+}
+
+func formatStarted(name string, color bool) string {
+	url := "https://" + name + ".localhost"
+	if !color {
+		return fmt.Sprintf("✓ %s started\n  %s\n", name, url)
+	}
+	const (
+		green = "\x1b[38;5;78m"
+		muted = "\x1b[38;5;245m"
+		cyan  = "\x1b[38;5;80m"
+		reset = "\x1b[0m"
+	)
+	return green + "✓ " + name + reset + " " + muted + "started" + reset + "\n  " + cyan + url + reset + "\n"
 }
 
 func foreground(path string, out io.Writer) error {

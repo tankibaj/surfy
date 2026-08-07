@@ -25,6 +25,31 @@ func TestHelpDescribesCommands(t *testing.T) {
 	}
 }
 
+func TestFormatStarted(t *testing.T) {
+	tests := []struct {
+		name  string
+		color bool
+		want  string
+	}{
+		{
+			name: "plain",
+			want: "✓ team-dashboard started\n  https://team-dashboard.localhost\n",
+		},
+		{
+			name:  "calm high contrast",
+			color: true,
+			want:  "\x1b[38;5;78m✓ team-dashboard\x1b[0m \x1b[38;5;245mstarted\x1b[0m\n  \x1b[38;5;80mhttps://team-dashboard.localhost\x1b[0m\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatStarted("team-dashboard", tt.color); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestEnsureUserStateDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "custom", "surfy")
 	if e := ensureUserStateDir(dir); e != nil {
