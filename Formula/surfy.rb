@@ -3,7 +3,7 @@ class Surfy < Formula
   homepage "https://github.com/tankibaj/surfy"
   version "0.1.1"
   url "https://github.com/tankibaj/surfy/releases/download/v0.1.1/surfy_0.1.1_darwin_arm64.tar.gz"
-  sha256 :no_check
+  sha256 "b1cced4fe6a2f9401fe0cdd0b491d5666479ff9aa6ce86ff1365d80108a2fa71"
 
   depends_on :macos
   depends_on arch: :arm64
