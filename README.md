@@ -16,9 +16,9 @@ surfy install # one macOS administrator authorization
 
 The formula installs the native Apple Silicon CLI into Homebrew’s managed prefix (`/opt/homebrew/bin` through its stable symlink). For a user-local installation without Homebrew, run `make install-user` and add `~/.local/bin` to `PATH`.
 
-## Version 0.2 clean break
+## Version 0.1 clean break
 
-Version 0.2.0 is a full rebrand with no automatic compatibility migration. Before installing Surfy, remove any pre-0.2 edge service, login agents, and local CA with the original CLI. Rename each project manifest to `surfy.yaml`; previous state directories and environment-variable names are not read by Surfy.
+Version 0.1.0 is Surfy's first release and has no automatic compatibility migration from the archived predecessor. Before installing Surfy, remove any previous edge service, login agents, and local CA with the original CLI. Rename each project manifest to `surfy.yaml`; previous state directories and environment-variable names are not read by Surfy.
 
 For the optimized Apple Silicon release binary:
 
@@ -26,7 +26,7 @@ For the optimized Apple Silicon release binary:
 make build-apple-silicon
 ```
 
-Maintainers release by pushing a matching version tag (for example `v0.2.0`). GitHub Actions verifies and cross-builds the native ARM64 archive, publishes the release, and updates the Homebrew formula checksum on `main`.
+After CI succeeds for a merge or push to `main`, GitHub Actions verifies and cross-builds any unpublished version, creates its version tag and release, and updates the Homebrew formula checksum on `main`.
 
 The project is then available at `https://<directory-name>.localhost`; `/` is sent to `web`, and `/api/*` is sent unchanged to `api`. The backend application owns the `/api` route.
 

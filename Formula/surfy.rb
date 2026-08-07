@@ -1,9 +1,9 @@
 class Surfy < Formula
   desc "Local multi-application HTTPS runtime"
   homepage "https://github.com/tankibaj/surfy"
-  version "0.2.0"
-  url "https://github.com/tankibaj/surfy/releases/download/v0.2.0/surfy_0.2.0_darwin_arm64.tar.gz"
-  sha256 :no_check # Replaced by the v0.2.0 release workflow.
+  version "0.1.0"
+  url "https://github.com/tankibaj/surfy/releases/download/v0.1.0/surfy_0.1.0_darwin_arm64.tar.gz"
+  sha256 :no_check # Replaced by the v0.1.0 release workflow.
 
   depends_on :macos
   depends_on arch: :arm64
