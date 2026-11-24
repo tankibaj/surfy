@@ -7,6 +7,8 @@
 
 Surfy runs your frontend and backend together at a memorable `.localhost` URL—without port hunting, certificate warnings, or separate process-manager setup.
 
+[More about Surfy](https://thenaim.com/projects/surfy/)
+
 ```text
 https://my-project.localhost          → frontend
 https://my-project.localhost/api/*    → backend, path preserved
